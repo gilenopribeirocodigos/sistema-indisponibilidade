@@ -631,53 +631,36 @@ def debug_sessao(request: Request):
 # ROTA DE IMPORTAÇÃO CSV
 # ========================================
 
+from fastapi import UploadFile, File
+
 @app.get("/importar-csv", response_class=HTMLResponse)
 def importar_csv_page(request: Request, db: Session = Depends(get_db)):
     """Página de importação de CSV"""
-    
     if not verificar_autenticacao(request):
         return RedirectResponse(url="/login")
-    
     usuario = get_usuario_logado(request, db)
     if not usuario:
         request.session.clear()
         return RedirectResponse(url="/login")
-    
-    return templates.TemplateResponse(
-        "importar_csv.html",
-        {"request": request, "usuario": usuario}
-    )
-
+    return templates.TemplateResponse("importar_csv.html", {"request": request, "usuario": usuario})
 
 @app.post("/api/importar-eletricistas")
-async def importar_eletricistas(
-    request: Request,
-    arquivo: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
+async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...), db: Session = Depends(get_db)):
     """Importar eletricistas de arquivo CSV"""
-    
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
     from models import EstruturaEquipes
     import csv
     import io
-    
     try:
         contents = await arquivo.read()
         decoded = contents.decode('utf-8')
         csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
-        
         total_importado = 0
         total_atualizado = 0
-        
         for row in csv_reader:
             try:
-                existe = db.query(EstruturaEquipes).filter(
-                    EstruturaEquipes.matricula == row.get('matricula')
-                ).first()
-                
+                existe = db.query(EstruturaEquipes).filter(EstruturaEquipes.matricula == row.get('matricula')).first()
                 if existe:
                     existe.colaborador = row.get('colaborador')
                     existe.prefixo = row.get('prefixo')
@@ -688,41 +671,18 @@ async def importar_eletricistas(
                     existe.encarregado = row.get('coordenador')
                     total_atualizado += 1
                 else:
-                    novo = EstruturaEquipes(
-                        colaborador=row.get('colaborador'),
-                        matricula=row.get('matricula'),
-                        prefixo=row.get('prefixo'),
-                        base=row.get('base'),
-                        polo=row.get('polo'),
-                        regional=row.get('regional'),
-                        superv_campo=row.get('superv_campo'),
-                        encarregado=row.get('coordenador')
-                    )
+                    novo = EstruturaEquipes(colaborador=row.get('colaborador'), matricula=row.get('matricula'), prefixo=row.get('prefixo'), base=row.get('base'), polo=row.get('polo'), regional=row.get('regional'), superv_campo=row.get('superv_campo'), encarregado=row.get('coordenador'))
                     db.add(novo)
                     total_importado += 1
-                
                 if (total_importado + total_atualizado) % 50 == 0:
                     db.commit()
-                    
             except:
                 continue
-        
         db.commit()
-        
-        return JSONResponse({
-            "success": True,
-            "total_novos": total_importado,
-            "total_atualizados": total_atualizado,
-            "mensagem": f"✅ {total_importado} novos + {total_atualizado} atualizados!"
-        })
-        
+        return JSONResponse({"success": True, "total_novos": total_importado, "total_atualizados": total_atualizado, "mensagem": f"✅ {total_importado} novos + {total_atualizado} atualizados!"})
     except Exception as e:
         db.rollback()
         return JSONResponse({"success": False, "erro": str(e)})
-
-
-
-
 
 
 
@@ -733,5 +693,6 @@ async def importar_eletricistas(
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
