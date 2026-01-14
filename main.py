@@ -22,6 +22,14 @@ PORT = int(os.getenv("PORT", 8000))
 # Inicializar FastAPI
 app = FastAPI(title="Sistema de Indisponibilidade")
 
+# Criar tabelas automaticamente na inicialização
+@app.on_event("startup")
+async def startup_event():
+    """Executado quando o servidor inicia"""
+    from models import criar_tabelas
+    criar_tabelas()
+    print("🚀 Sistema iniciado!")
+
 # Configurar middleware de sessões (IMPORTANTE!)
 SECRET_KEY = os.getenv('SECRET_KEY', 'chave-secreta-padrao-mude-isso')
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -595,4 +603,5 @@ def debug_sessao(request: Request):
 # ========================================
 
 if __name__ == "__main__":
+
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
