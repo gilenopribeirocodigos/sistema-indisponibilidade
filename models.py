@@ -105,4 +105,12 @@ class Remanejamento(Base):
     temporario = Column(Boolean, default=True)
     usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
     criado_em = Column(DateTime, server_default=func.now())
+
     observacoes = Column(Text)
+
+# Função para criar todas as tabelas
+def criar_tabelas():
+    """Cria todas as tabelas no banco de dados"""
+    from database import engine
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tabelas criadas com sucesso!")
