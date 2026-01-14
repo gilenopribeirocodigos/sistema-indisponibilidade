@@ -654,7 +654,14 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
     import io
     try:
         contents = await arquivo.read()
-        decoded = contents.decode('utf-8')
+        # Tentar múltiplos encodings
+        try:
+            decoded = contents.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                decoded = contents.decode('latin-1')
+            except UnicodeDecodeError:
+                decoded = contents.decode('windows-1252')
         csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
         total_importado = 0
         total_atualizado = 0
@@ -693,6 +700,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
