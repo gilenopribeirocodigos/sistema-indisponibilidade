@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Operações</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/registro_v2.css">
+</head>
+<body>
+    <div class="registro-container">
+        <!-- Header -->
+        <div class="header-registro">
+            <a href="/home" class="btn-voltar">← Voltar</a>
+            <h1>📋 Registro de Operações</h1>
+            <div class="user-info-mini">
+                <span>{{ usuario.nome }}</span>
+                <span class="badge badge-{{ usuario.perfil.lower() }}">{{ usuario.perfil }}</span>
+                <br>
+                <small>Supervisão: {{ usuario.base_responsavel or "Todas" }}</small>
+            </div>
+        </div>
+
+        <!-- Mensagens -->
+        {% if erro %}
+        <div class="alert alert-erro">❌ {{ erro }}</div>
+        {% endif %}
+        
+        {% if sucesso %}
+        <div class="alert alert-sucesso">✅ {{ sucesso }}</div>
+        {% endif %}
+
+        <!-- Seletor de Tipo (3 botões) -->
+        <div class="tipo-selector">
+            <button class="tipo-btn active" data-tipo="frequencia">
+                <span class="tipo-icon">📊</span>
+                <span class="tipo-label">Frequência</span>
+                <span class="tipo-desc">Montar equipes do dia</span>
+            </button>
+            <button class="tipo-btn" data-tipo="remanejado">
+                <span class="tipo-icon">🔄</span>
+                <span class="tipo-label">Remanejar</span>
+                <span class="tipo-desc">Pegar eletricista emprestado</span>
+            </button>
+            <button class="tipo-btn" data-tipo="indisponivel">
+                <span class="tipo-icon">⚠️</span>
+                <span class="tipo-label">Indisponível</span>
+                <span class="tipo-desc">Registrar prefixo parado</span>
+            </button>
+        </div>
+
+        <!-- ========================================
+             SEÇÃO 1: FREQUÊNCIA
+        ======================================== -->
+        <div id="secao-frequencia" class="secao-operacao active">
+            <div class="form-section">
+                <h3>📊 Controle de Frequência</h3>
+                <p class="section-subtitle">
+                    Selecione os eletricistas presentes e associe aos prefixos. 
+                    <strong>Total: {{ eletricistas|length }} eletricista(s)</strong>
+                </p>
+                
+                <!-- Lista de eletricistas com checkbox -->
+                <div class="eletricistas-grid">
+                    {% for elet in eletricistas %}
+                    <div class="eletricista-card" data-id="{{ elet.id }}">
+                        <input 
+                            type="checkbox" 
+                            id="elet-{{ elet.id }}" 
+                            class="eletricista-checkbox"
+                            data-nome="{{ elet.colaborador }}"
+                            data-matricula="{{ elet.matricula }}"
+                            data-prefixo="{{ elet.prefixo }}"
+                            data-base="{{ elet.base }}"
+                        >
+                        <label for="elet-{{ elet.id }}">
+                            <div class="elet-nome">{{ elet.colaborador }}</div>
+                            <div class="elet-info">
+                                <span>Mat: {{ elet.matricula }}</span>
+                                <span>{{ elet.prefixo }}</span>
+                            </div>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Painel de associação -->
+                <div class="associacao-panel">
+                    <div class="associacao-header">
+                        <h4>Eletricista Selecionado:</h4>
+                        <div id="eletricista-info" class="info-vazia">
+                            Selecione um eletricista acima
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prefixo-frequencia">Prefixo da Equipe:</label>
+                        <input 
+                            type="text" 
+                            id="prefixo-frequencia" 
+                            placeholder="Digite ou selecione..."
+                            list="prefixos-lista"
+                        >
+                        <datalist id="prefixos-lista">
+                            {% for prefixo in prefixos_supervisor %}
+                            <option value="{{ prefixo }}">
+                            {% endfor %}
+                        </datalist>
+                        <small class="help-text">Sistema sugere o prefixo, mas você pode alterar</small>
+                    </div>
+                    
+                    <button id="btn-associar" class="btn btn-primary btn-lg" disabled>
+                        ✅ Associar ao Prefixo
+                    </button>
+                </div>
+
+                <!-- Lista de associações temporárias -->
+                <div id="associacoes-temporarias" style="display:none;">
+                    <h4>📋 Associações Pendentes de Salvamento:</h4>
+                    <div id="lista-associacoes"></div>
+                    <div class="acoes-finais">
+                        <button id="btn-limpar-todas" class="btn btn-secondary">
+                            🗑️ Limpar Todas
+                        </button>
+                        <button id="btn-salvar-frequencia" class="btn btn-success btn-lg">
+                            💾 Salvar Todas as Associações
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             SEÇÃO 2: REMANEJADO
+        ======================================== -->
+        <div id="secao-remanejado" class="secao-operacao">
+            <div class="form-section">
+                <h3>🔄 Remanejar Eletricista</h3>
+                <p class="section-subtitle">
+                    Busque um eletricista de outra supervisão para usar temporariamente
+                </p>
+                
+                <div class="form-group">
+                    <label for="busca-remanejar">Buscar Eletricista:</label>
+                    <input 
+                        type="text" 
+                        id="busca-remanejar"
+                        placeholder="Digite o nome do eletricista..."
+                        autocomplete="off"
+                    >
+                    <small class="help-text">Digite ao menos 3 letras</small>
+                </div>
+                
+                <div id="resultado-busca-remanejar" class="resultado-busca"></div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             SEÇÃO 3: INDISPONÍVEL
+        ======================================== -->
+        <div id="secao-indisponivel" class="secao-operacao">
+            <div class="form-section">
+                <h3>⚠️ Registrar Indisponibilidade</h3>
+                <p class="section-subtitle">
+                    Registre um eletricista e prefixo como indisponível
+                </p>
+                
+                <form id="form-indisponivel">
+                    <div class="form-group">
+                        <label for="eletricista-indisponivel">Eletricista: *</label>
+                        <input 
+                            type="text" 
+                            id="eletricista-indisponivel"
+                            name="eletricista"
+                            placeholder="Digite o nome..."
+                            autocomplete="off"
+                            required
+                        >
+                        <input type="hidden" id="eletricista-id-indisponivel" name="eletricista_id">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prefixo-indisponivel">Prefixo: *</label>
+                        <input 
+                            type="text" 
+                            id="prefixo-indisponivel"
+                            name="prefixo"
+                            placeholder="Ex: PI-AGB-C001M"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motivo-indisponivel">Motivo: *</label>
+                        <select id="motivo-indisponivel" name="motivo_id" required>
+                            <option value="">Selecione o motivo...</option>
+                            {% for motivo in motivos %}
+                            <option value="{{ motivo.id }}">{{ motivo.descricao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="observacoes-indisponivel">Observações:</label>
+                        <textarea 
+                            id="observacoes-indisponivel"
+                            name="observacoes" 
+                            rows="3"
+                            placeholder="Informações adicionais..."
+                        ></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        ⚠️ Registrar Indisponibilidade
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="footer-registro">
+            <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
+            <p>Data: {{ hoje }} | Usuário: {{ usuario.nome }}</p>
+        </div>
+    </div>
+
+    <script src="/static/js/registro_v2.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Indisponibilidade</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/registro.css">
+</head>
+
+
+<!-- JavaScript -->
+    <script src="/static/js/autocomplete-eletricistas.js"></script>
+</body>
+</html>
+
+<!-- JavaScript -->
+    <script src="/static/js/autocomplete-eletricistas.js"></script>
+    <script src="/static/js/autocomplete-prefixos.js"></script>
+</body>
+</html>
+
+<body>
+    <div class="registro-container">
+        <!-- Header -->
+        <div class="header-registro">
+            <a href="/home" class="btn-voltar">← Voltar</a>
+            <h1>📝 Registrar Indisponibilidade</h1>
+            <div class="user-info-mini">
+                <span>{{ usuario.nome }}</span>
+                <span class="badge badge-{{ usuario.perfil.lower() }}">{{ usuario.perfil }}</span>
+            </div>
+        </div>
+
+        <!-- Mensagens -->
+        {% if erro %}
+        <div class="alert alert-erro">
+            ❌ {{ erro }}
+        </div>
+        {% endif %}
+
+        {% if sucesso %}
+        <div class="alert alert-sucesso">
+            ✅ {{ sucesso }}
+        </div>
+        {% endif %}
+
+        <!-- Formulário -->
+        <form method="POST" action="/registrar" class="form-registro">
+            
+            <!-- SEÇÃO 1: Tipo de Registro -->
+            <div class="form-section">
+                <h3>1. Tipo de Registro</h3>
+                
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="tipo" value="INDISPONIVEL" checked required>
+                        <div class="radio-content">
+                            <span class="radio-icon">⚠️</span>
+                            <span class="radio-label">Indisponível</span>
+                            <span class="radio-desc">Colaborador ou viatura temporariamente indisponível</span>
+                        </div>
+                    </label>
+                    
+                    <label class="radio-card">
+                        <input type="radio" name="tipo" value="REMANEJADO" required>
+                        <div class="radio-content">
+                            <span class="radio-icon">🔄</span>
+                            <span class="radio-label">Remanejado</span>
+                            <span class="radio-desc">Colaborador remanejado para outra equipe</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 2: Dados do Eletricista -->
+            <div class="form-section">
+                <h3>2. Dados do Eletricista</h3>
+                
+                <div class="form-group">
+                    <label for="colaborador">Eletricista *</label>
+                    <input 
+                        type="text" 
+                        id="colaborador" 
+                        name="colaborador" 
+                        placeholder="Digite o nome do eletricista..."
+                        required
+                        autocomplete="off"
+                    >
+                    <small class="help-text">Digite ao menos 3 letras para buscar</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="matricula">Matrícula</label>
+                        <input 
+                            type="text" 
+                            id="matricula" 
+                            name="matricula" 
+                            placeholder="Automático"
+                            readonly
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="base">Base</label>
+                        <input 
+                            type="text" 
+                            id="base" 
+                            name="base" 
+                            placeholder="Automático"
+                            readonly
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="prefixo">Prefixo da Equipe *</label>
+                    <input 
+                        type="text" 
+                        id="prefixo" 
+                        name="prefixo" 
+                        placeholder="Ex: PI-AGB-C001M"
+                        required
+                        autocomplete="off"
+                    >
+                    <small class="help-text">Digite ao menos 3 caracteres para buscar</small>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 3: Motivo -->
+            <div class="form-section">
+                <h3>3. Motivo da Indisponibilidade</h3>
+                
+                <div class="form-group">
+                    <label for="motivo_id">Motivo *</label>
+                    <select id="motivo_id" name="motivo_id" required>
+                        <option value="">Selecione o motivo...</option>
+                        {% for motivo in motivos %}
+                        <option value="{{ motivo.id }}">{{ motivo.descricao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="observacoes">Observações</label>
+                    <textarea 
+                        id="observacoes" 
+                        name="observacoes" 
+                        rows="4"
+                        placeholder="Informações adicionais sobre a indisponibilidade..."
+                    ></textarea>
+                    <small class="help-text">Opcional - Máximo 500 caracteres</small>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 4: Período (opcional para esta etapa) -->
+            <div class="form-section">
+                <h3>4. Período</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="data_inicio">Data Início</label>
+                        <input 
+                            type="date" 
+                            id="data_inicio" 
+                            name="data_inicio"
+                            value="{{ hoje }}"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="data_fim">Data Fim (opcional)</label>
+                        <input 
+                            type="date" 
+                            id="data_fim" 
+                            name="data_fim"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <div class="form-actions">
+                <button type="reset" class="btn btn-secondary">Limpar</button>
+                <button type="submit" class="btn btn-primary">Registrar</button>
+            </div>
+        </form>
+
+        <!-- Rodapé -->
+        <div class="footer-registro">
+            <p>* Campos obrigatórios</p>
+            <p>Registrado por: {{ usuario.nome }} ({{ usuario.perfil }})</p>
+        </div>
+    </div>
+</body>
+</html>

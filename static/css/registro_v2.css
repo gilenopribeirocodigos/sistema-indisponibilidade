@@ -1,0 +1,460 @@
+/* ==========================================
+   REGISTRO V2 - INTERFACE DINÂMICA
+========================================== */
+
+body {
+    background: #f5f5f5;
+    margin: 0;
+    padding: 0;
+}
+
+.registro-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 15px;
+    min-height: 100vh;
+}
+
+/* Header */
+.header-registro {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header-registro h1 {
+    color: #2E75B5;
+    font-size: 24px;
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.btn-voltar {
+    background: #f0f0f0;
+    color: #666;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-voltar:hover {
+    background: #e0e0e0;
+}
+
+.user-info-mini {
+    text-align: right;
+    font-size: 14px;
+    color: #666;
+}
+
+/* Seletor de Tipo (3 botões) */
+.tipo-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.tipo-btn {
+    background: white;
+    border: 3px solid #e0e0e0;
+    padding: 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.tipo-btn:hover {
+    border-color: #2E75B5;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(46, 117, 181, 0.2);
+}
+
+.tipo-btn.active {
+    border-color: #2E75B5;
+    background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
+}
+
+.tipo-icon {
+    font-size: 48px;
+}
+
+.tipo-label {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+.tipo-desc {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Seções de operação */
+.secao-operacao {
+    display: none;
+}
+
+.secao-operacao.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.form-section {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.form-section h3 {
+    color: #2E75B5;
+    margin-bottom: 10px;
+}
+
+.section-subtitle {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+/* Grid de eletricistas */
+.eletricistas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 25px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.eletricista-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s ease;
+}
+
+.eletricista-card:has(input:checked) {
+    border-color: #2E75B5;
+    background: #f0f7ff;
+}
+
+.eletricista-card label {
+    cursor: pointer;
+    display: block;
+}
+
+.elet-nome {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.elet-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+}
+
+.eletricista-checkbox {
+    float: right;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+/* Painel de associação */
+.associacao-panel {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.associacao-header {
+    margin-bottom: 15px;
+}
+
+.associacao-header h4 {
+    color: #333;
+    margin-bottom: 8px;
+}
+
+#eletricista-info {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border: 2px solid #e0e0e0;
+}
+
+#eletricista-info.info-preenchida {
+    border-color: #2E75B5;
+    background: #f0f7ff;
+}
+
+.info-vazia {
+    color: #999;
+    font-style: italic;
+}
+
+/* Form groups */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.form-group input[type="text"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #2E75B5;
+    box-shadow: 0 0 0 3px rgba(46, 117, 181, 0.1);
+}
+
+.help-text {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+/* Botões */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-lg {
+    padding: 16px 32px;
+    font-size: 18px;
+    width: 100%;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #2E75B5 0%, #4472C4 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(46, 117, 181, 0.4);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #34ce57 100%);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+/* Lista de associações temporárias */
+#associacoes-temporarias {
+    background: #fff9e6;
+    border: 2px solid #ffc107;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+#associacoes-temporarias h4 {
+    color: #f57c00;
+    margin-bottom: 15px;
+}
+
+#lista-associacoes {
+    margin-bottom: 20px;
+}
+
+.associacao-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #e0e0e0;
+}
+
+.associacao-detalhes {
+    flex: 1;
+}
+
+.associacao-detalhes strong {
+    color: #333;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.associacao-detalhes small {
+    color: #666;
+    font-size: 13px;
+}
+
+.btn-remover-associacao {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-remover-associacao:hover {
+    background: #d32f2f;
+}
+
+.acoes-finais {
+    display: flex;
+    gap: 10px;
+}
+
+.acoes-finais .btn {
+    flex: 1;
+}
+
+/* Resultado de busca */
+.resultado-busca {
+    margin-top: 15px;
+}
+
+/* Alertas */
+.alert {
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-erro {
+    background: #ffebee;
+    color: #c62828;
+    border: 2px solid #ef5350;
+}
+
+.alert-sucesso {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 2px solid #66bb6a;
+}
+
+/* Footer */
+.footer-registro {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    font-size: 12px;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .tipo-selector {
+        grid-template-columns: 1fr;
+    }
+    
+    .eletricistas-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .acoes-finais {
+        flex-direction: column;
+    }
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-admin {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.badge-supervisor {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.badge-fiscal {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}

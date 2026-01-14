@@ -1,0 +1,202 @@
+/* Reset e configurações globais */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Container principal */
+.container {
+    width: 100%;
+    max-width: 420px;
+}
+
+/* Caixa de login */
+.login-box {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    padding: 40px 30px;
+    animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    color: #2E75B5;
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.header p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Alertas */
+.alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.alert-erro {
+    background-color: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+}
+
+.alert-sucesso {
+    background-color: #efe;
+    color: #3c3;
+    border: 1px solid #cfc;
+}
+
+/* Formulário */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #2E75B5;
+    box-shadow: 0 0 0 3px rgba(46, 117, 181, 0.1);
+}
+
+/* Botões */
+.btn-login {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #2E75B5 0%, #4472C4 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+.btn-login:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(46, 117, 181, 0.4);
+}
+
+.btn-login:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background: #f0f0f0;
+    color: #666;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    margin-top: 15px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+/* Info do usuário */
+.info-usuario {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.info-usuario p {
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 14px;
+}
+
+.info-usuario p:last-child {
+    margin-bottom: 0;
+}
+
+/* Rodapé */
+.footer {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.footer p {
+    color: #999;
+    font-size: 12px;
+}
+
+/* Responsivo */
+@media (max-width: 480px) {
+    .login-box {
+        padding: 30px 20px;
+    }
+    
+    .header h1 {
+        font-size: 20px;
+    }
+}
+
+/* Estilo para body da home (fundo branco) */
+body.home-body {
+    background: #f5f5f5;
+}

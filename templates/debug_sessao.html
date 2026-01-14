@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Sessão</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .debug-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .debug-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .debug-box h2 {
+            color: #2E75B5;
+            margin-bottom: 20px;
+        }
+
+        .session-data {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .session-data p {
+            margin: 10px 0;
+            padding: 8px;
+            background: white;
+            border-left: 4px solid #2E75B5;
+            padding-left: 12px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-logado {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-nao-logado {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #2E75B5;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e5a8f;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <div class="debug-box">
+            <h2>🔍 Debug - Informações da Sessão</h2>
+
+            {% if logado %}
+                <h3>Status: <span class="status-badge status-logado">✅ LOGADO</span></h3>
+            {% else %}
+                <h3>Status: <span class="status-badge status-nao-logado">❌ NÃO LOGADO</span></h3>
+            {% endif %}
+
+            <div class="session-data">
+                <h4>Dados da Sessão:</h4>
+                {% if logado %}
+                    <p><strong>User ID:</strong> {{ session_data.user_id }}</p>
+                    <p><strong>Nome:</strong> {{ session_data.user_nome }}</p>
+                    <p><strong>Perfil:</strong> {{ session_data.user_perfil }}</p>
+                    <p><strong>Base:</strong> {{ session_data.user_base or "Não definida" }}</p>
+                {% else %}
+                    <p style="color: #999;">Nenhum dado de sessão encontrado</p>
+                {% endif %}
+            </div>
+
+            <div class="btn-group">
+                <a href="/home" class="btn btn-primary">Ir para Home</a>
+                <a href="/login" class="btn btn-secondary">Ir para Login</a>
+                {% if logado %}
+                    <a href="/logout" class="btn btn-danger">Sair</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
