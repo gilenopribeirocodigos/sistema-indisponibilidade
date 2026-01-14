@@ -649,47 +649,96 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
     """Importar eletricistas de arquivo CSV"""
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
     from models import EstruturaEquipes
     import csv
     import io
+    
     try:
+        # Ler arquivo
         contents = await arquivo.read()
-        # Tentar múltiplos encodings
-        try:
-            decoded = contents.decode('utf-8')
-        except UnicodeDecodeError:
+        
+        # Tentar diferentes encodings
+        decoded = None
+        for encoding in ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']:
             try:
-                decoded = contents.decode('latin-1')
-            except UnicodeDecodeError:
-                decoded = contents.decode('windows-1252')
-        csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
-        total_importado = 0
-        total_atualizado = 0
-        for row in csv_reader:
-            try:
-                existe = db.query(EstruturaEquipes).filter(EstruturaEquipes.matricula == row.get('matricula')).first()
-                if existe:
-                    existe.colaborador = row.get('colaborador')
-                    existe.prefixo = row.get('prefixo')
-                    existe.base = row.get('base')
-                    existe.polo = row.get('polo')
-                    existe.regional = row.get('regional')
-                    existe.superv_campo = row.get('superv_campo')
-                    existe.encarregado = row.get('coordenador')
-                    total_atualizado += 1
-                else:
-                    novo = EstruturaEquipes(colaborador=row.get('colaborador'), matricula=row.get('matricula'), prefixo=row.get('prefixo'), base=row.get('base'), polo=row.get('polo'), regional=row.get('regional'), superv_campo=row.get('superv_campo'), encarregado=row.get('coordenador'))
-                    db.add(novo)
-                    total_importado += 1
-                if (total_importado + total_atualizado) % 50 == 0:
-                    db.commit()
+                decoded = contents.decode(encoding)
+                break
             except:
                 continue
+        
+        if not decoded:
+            return JSONResponse({"success": False, "erro": "Não foi possível ler o arquivo"})
+        
+        # Ler CSV com delimitador ;
+        csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
+        
+        total_importado = 0
+        erros = []
+        
+        for idx, row in enumerate(csv_reader, start=2):
+            try:
+                matricula = row.get('matricula', '').strip()
+                colaborador = row.get('colaborador', '').strip()
+                
+                # Validar campos obrigatórios
+                if not matricula or not colaborador:
+                    erros.append(f"Linha {idx}: matrícula ou colaborador vazio")
+                    continue
+                
+                # Verificar se já existe
+                existe = db.query(EstruturaEquipes).filter(
+                    EstruturaEquipes.matricula == matricula
+                ).first()
+                
+                if existe:
+                    # Atualizar
+                    existe.colaborador = colaborador
+                    existe.prefixo = row.get('prefixo', '').strip()
+                    existe.base = row.get('base', '').strip()
+                    existe.polo = row.get('polo', '').strip()
+                    existe.regional = row.get('regional', '').strip()
+                    existe.superv_campo = row.get('superv_campo', '').strip()
+                    existe.encarregado = row.get('coordenador', '').strip()
+                else:
+                    # Criar novo
+                    novo = EstruturaEquipes(
+                        colaborador=colaborador,
+                        matricula=matricula,
+                        prefixo=row.get('prefixo', '').strip(),
+                        base=row.get('base', '').strip(),
+                        polo=row.get('polo', '').strip(),
+                        regional=row.get('regional', '').strip(),
+                        superv_campo=row.get('superv_campo', '').strip(),
+                        encarregado=row.get('coordenador', '').strip()
+                    )
+                    db.add(novo)
+                    total_importado += 1
+                
+                # Commit a cada 20 registros
+                if total_importado % 20 == 0:
+                    db.commit()
+                    
+            except Exception as e:
+                erros.append(f"Linha {idx}: {str(e)}")
+                if len(erros) > 10:
+                    break
+                continue
+        
+        # Commit final
         db.commit()
-        return JSONResponse({"success": True, "total_novos": total_importado, "total_atualizados": total_atualizado, "mensagem": f"✅ {total_importado} novos + {total_atualizado} atualizados!"})
+        
+        return JSONResponse({
+            "success": True,
+            "total_novos": total_importado,
+            "erros_count": len(erros),
+            "erros": erros[:5],
+            "mensagem": f"✅ {total_importado} eletricistas importados com sucesso!"
+        })
+        
     except Exception as e:
         db.rollback()
-        return JSONResponse({"success": False, "erro": str(e)})
+        return JSONResponse({"success": False, "erro": f"Erro: {str(e)}"})
 
 
 
@@ -700,6 +749,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
