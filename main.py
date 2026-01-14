@@ -26,8 +26,38 @@ app = FastAPI(title="Sistema de Indisponibilidade")
 @app.on_event("startup")
 async def startup_event():
     """Executado quando o servidor inicia"""
-    from models import criar_tabelas
+    from models import criar_tabelas, Usuario
+    from auth import criar_hash_senha
+    from database import SessionLocal
+    
+    # Criar tabelas
     criar_tabelas()
+    print("✅ Tabelas criadas!")
+    
+    # Criar usuário admin se não existir
+    db = SessionLocal()
+    try:
+        admin = db.query(Usuario).filter(Usuario.login == "admin").first()
+        if not admin:
+            novo_admin = Usuario(
+                nome="Administrador",
+                login="admin",
+                senha_hash=criar_hash_senha("admin123"),
+                perfil="admin",
+                base_responsavel="Todas",
+                ativo=True
+            )
+            db.add(novo_admin)
+            db.commit()
+            print("✅ Usuário admin criado!")
+        else:
+            print("✅ Usuário admin já existe!")
+    except Exception as e:
+        print(f"❌ Erro ao criar admin: {e}")
+        db.rollback()
+    finally:
+        db.close()
+    
     print("🚀 Sistema iniciado!")
 
 # Configurar middleware de sessões (IMPORTANTE!)
@@ -605,3 +635,4 @@ def debug_sessao(request: Request):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
