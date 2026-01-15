@@ -157,10 +157,16 @@ class RegistroV2 {
                     btnSalvarFrequencia.disabled = true;
                     btnSalvarFrequencia.textContent = '⏳ Salvando...';
                     
+                    // Pegar data selecionada do campo
+                    const dataRegistro = document.getElementById('data-registro').value;
+                    
                     const response = await fetch('/api/salvar-frequencia', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ associacoes: this.associacoesTemporarias })
+                        body: JSON.stringify({ 
+                            associacoes: this.associacoesTemporarias,
+                            data: dataRegistro 
+                        })
                     });
                     
                     const result = await response.json();
@@ -506,3 +512,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
