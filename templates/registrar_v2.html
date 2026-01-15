@@ -30,6 +30,21 @@
         <div class="alert alert-sucesso">✅ {{ sucesso }}</div>
         {% endif %}
 
+        <!-- Seletor de Data -->
+        <div class="data-selector">
+            <div class="data-header">
+                <label for="data-registro">📅 Data do Registro:</label>
+                <input 
+                    type="date" 
+                    id="data-registro" 
+                    name="data-registro"
+                    value="{{ data_selecionada }}"
+                    max="{{ hoje_iso }}"
+                >
+                <span class="data-info">Mostrando eletricistas disponíveis para esta data</span>
+            </div>
+        </div>
+
         <!-- Seletor de Tipo (3 botões) -->
         <div class="tipo-selector">
             <button class="tipo-btn active" data-tipo="frequencia">
@@ -226,4 +241,5 @@
 
     <script src="/static/js/registro_v2.js"></script>
 </body>
+
 </html>
