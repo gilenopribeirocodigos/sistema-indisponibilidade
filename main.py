@@ -382,17 +382,25 @@ async def salvar_frequencia(
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
     from models import EquipeDia
+    from datetime import datetime
     
     try:
         # Ler JSON do body
         body = await request.json()
         associacoes = body.get('associacoes', [])
+        data_registro = body.get('data', None)
         
         if not associacoes:
             return JSONResponse({"success": False, "erro": "Nenhuma associação enviada"})
         
-        # Data de hoje
-        hoje = date.today()
+        # Definir data (hoje ou data informada)
+        if data_registro:
+            try:
+                data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
+            except:
+                data_obj = date.today()
+        else:
+            data_obj = date.today()
         
         # Salvar cada associação
         total_salvo = 0
@@ -400,7 +408,7 @@ async def salvar_frequencia(
             nova_equipe = EquipeDia(
                 eletricista_id=assoc['eletricista_id'],
                 prefixo=assoc['prefixo'],
-                data=hoje,
+                data=data_obj,
                 supervisor_registro=usuario.base_responsavel or usuario.nome
             )
             db.add(nova_equipe)
@@ -411,7 +419,8 @@ async def salvar_frequencia(
         return JSONResponse({
             "success": True,
             "total": total_salvo,
-            "mensagem": f"{total_salvo} associação(ões) salva(s) com sucesso!"
+            "data": data_obj.strftime('%d/%m/%Y'),
+            "mensagem": f"{total_salvo} associação(ões) salva(s) para {data_obj.strftime('%d/%m/%Y')}!"
         })
         
     except Exception as e:
@@ -888,6 +897,7 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
