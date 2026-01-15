@@ -576,21 +576,63 @@ async def salvar_indisponibilidade(
 # ========================================
 
 @app.get("/api/buscar-eletricistas")
-def buscar_eletricistas(q: str = "", db: Session = Depends(get_db)):
+def buscar_eletricistas(
+    q: str = "", 
+    data: str = None,
+    db: Session = Depends(get_db)
+):
     """
     API para buscar eletricistas por nome.
-    Retorna JSON com lista de eletricistas que correspondem à busca.
+    Exclui eletricistas já registrados na data especificada.
     """
-    from models import EstruturaEquipes
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, Remanejamento
+    from datetime import datetime
     
     # Verificar se tem termo de busca
     if not q or len(q) < 3:
         return JSONResponse({"eletricistas": []})
     
-    # Buscar eletricistas (case-insensitive)
-    eletricistas = db.query(EstruturaEquipes).filter(
+    # Definir data (hoje ou data informada)
+    if data:
+        try:
+            data_obj = datetime.strptime(data, '%Y-%m-%d').date()
+        except:
+            data_obj = date.today()
+    else:
+        data_obj = date.today()
+    
+    # Buscar IDs dos eletricistas já registrados na data
+    # 1. Registrados na Frequência (EquipeDia)
+    ids_frequencia = db.query(EquipeDia.eletricista_id).filter(
+        EquipeDia.data == data_obj
+    ).all()
+    
+    # 2. Registrados como Indisponíveis
+    ids_indisponivel = db.query(Indisponibilidade.eletricista_id).filter(
+        Indisponibilidade.data == data_obj
+    ).all()
+    
+    # 3. Remanejados
+    ids_remanejado = db.query(Remanejamento.eletricista_id).filter(
+        Remanejamento.data == data_obj
+    ).all()
+    
+    # Juntar todos os IDs (usar set para eliminar duplicatas)
+    ids_ja_registrados = set()
+    ids_ja_registrados.update([i[0] for i in ids_frequencia])
+    ids_ja_registrados.update([i[0] for i in ids_indisponivel])
+    ids_ja_registrados.update([i[0] for i in ids_remanejado])
+    
+    # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados
+    query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%")
-    ).limit(10).all()
+    )
+    
+    # EXCLUIR eletricistas já registrados
+    if ids_ja_registrados:
+        query = query.filter(~EstruturaEquipes.id.in_(ids_ja_registrados))
+    
+    eletricistas = query.limit(10).all()
     
     # Formatar resultado
     resultado = []
@@ -897,6 +939,7 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
