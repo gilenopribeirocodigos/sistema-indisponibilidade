@@ -791,6 +791,29 @@ def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         return JSONResponse({"success": False, "erro": str(e)})
 
+@app.get("/api/teste-motivos")
+def teste_motivos(db: Session = Depends(get_db)):
+    """Rota de teste para ver motivos"""
+    from models import MotivoIndisponibilidade
+    
+    try:
+        motivos = db.query(MotivoIndisponibilidade).all()
+        
+        resultado = []
+        for m in motivos:
+            resultado.append({
+                "id": m.id,
+                "descricao": m.descricao,
+                "ativo": m.ativo
+            })
+        
+        return JSONResponse({
+            "total": len(resultado),
+            "motivos": resultado
+        })
+    except Exception as e:
+        return JSONResponse({"erro": str(e)})
+        
 @app.get("/api/criar-motivos-padrao")
 def criar_motivos_padrao(db: Session = Depends(get_db)):
     """Criar motivos padrão de indisponibilidade"""
@@ -847,6 +870,7 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
