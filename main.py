@@ -791,28 +791,54 @@ def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         return JSONResponse({"success": False, "erro": str(e)})
 
-@app.get("/api/teste-motivos")
-def teste_motivos(db: Session = Depends(get_db)):
-    """Rota de teste para ver motivos"""
+@app.get("/api/criar-motivos-padrao")
+def criar_motivos_padrao(db: Session = Depends(get_db)):
+    """Criar motivos padrão de indisponibilidade"""
     from models import MotivoIndisponibilidade
     
+    motivos_corretos = [
+        "ATESTADO MEDICO",
+        "FALTA INJUSTIFICADA",
+        "VIATURA COM DEFEITO",
+        "VIATURA EM MANUTENCAO",
+        "ACIDENTE",
+        "TREINAMENTO",
+        "FERIAS",
+        "LICENCA",
+        "OUTRO"
+    ]
+    
     try:
-        motivos = db.query(MotivoIndisponibilidade).all()
+        total_criado = 0
         
-        resultado = []
-        for m in motivos:
-            resultado.append({
-                "id": m.id,
-                "descricao": m.descricao,
-                "ativo": m.ativo
-            })
+        for descricao in motivos_corretos:
+            # Verificar se já existe
+            existe = db.query(MotivoIndisponibilidade).filter(
+                MotivoIndisponibilidade.descricao == descricao
+            ).first()
+            
+            if not existe:
+                novo_motivo = MotivoIndisponibilidade(
+                    descricao=descricao,
+                    ativo=True
+                )
+                db.add(novo_motivo)
+                total_criado += 1
+        
+        db.commit()
         
         return JSONResponse({
-            "total": len(resultado),
-            "motivos": resultado
+            "success": True,
+            "total_criado": total_criado,
+            "mensagem": f"✅ {total_criado} motivos criados com sucesso!"
         })
+        
     except Exception as e:
-        return JSONResponse({"erro": str(e)})
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
 
 # ========================================
 # EXECUTAR SERVIDOR
@@ -821,6 +847,7 @@ def teste_motivos(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
