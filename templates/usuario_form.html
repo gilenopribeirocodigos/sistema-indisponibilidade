@@ -1,1 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if usuario_edicao %}Editar{% else %}Novo{% endif %} Usuário</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/usuarios.css">
+</head>
+<body>
+    <div class="usuarios-container">
+        <!-- Header -->
+        <div class="header-usuarios">
+            <a href="/usuarios" class="btn-voltar">← Voltar</a>
+            <h1>{% if usuario_edicao %}✏️ Editar Usuário{% else %}➕ Novo Usuário{% endif %}</h1>
+        </div>
 
+        <!-- Mensagens -->
+        {% if erro %}
+        <div class="alert alert-erro">❌ {{ erro }}</div>
+        {% endif %}
+
+        <!-- Formulário -->
+        <div class="form-card">
+            <form method="POST" id="form-usuario">
+                
+                <!-- Nome -->
+                <div class="form-group">
+                    <label for="nome">Nome Completo: *</label>
+                    <input 
+                        type="text" 
+                        id="nome" 
+                        name="nome" 
+                        value="{{ usuario_edicao.nome if usuario_edicao else '' }}"
+                        placeholder="Ex: João Silva"
+                        required
+                    >
+                </div>
+
+                <!-- Login -->
+                <div class="form-group">
+                    <label for="login">Login (usuário): *</label>
+                    <input 
+                        type="text" 
+                        id="login" 
+                        name="login" 
+                        value="{{ usuario_edicao.login if usuario_edicao else '' }}"
+                        placeholder="Ex: joao.silva"
+                        {% if usuario_edicao %}readonly{% endif %}
+                        required
+                    >
+                    {% if usuario_edicao %}
+                    <small class="help-text">O login não pode ser alterado</small>
+                    {% endif %}
+                </div>
+
+                <!-- Senha (apenas para novo) -->
+                {% if not usuario_edicao %}
+                <div class="form-group">
+                    <label for="senha">Senha: *</label>
+                    <input 
+                        type="password" 
+                        id="senha" 
+                        name="senha" 
+                        placeholder="Mínimo 6 caracteres"
+                        minlength="6"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="senha_confirmacao">Confirmar Senha: *</label>
+                    <input 
+                        type="password" 
+                        id="senha_confirmacao" 
+                        name="senha_confirmacao" 
+                        placeholder="Digite a senha novamente"
+                        minlength="6"
+                        required
+                    >
+                </div>
+                {% endif %}
+
+                <!-- Perfil -->
+                <div class="form-group">
+                    <label for="perfil">Perfil de Acesso: *</label>
+                    <select id="perfil" name="perfil" required>
+                        <option value="">Selecione...</option>
+                        <option value="admin" {% if usuario_edicao and usuario_edicao.perfil == 'admin' %}selected{% endif %}>
+                            👑 ADMIN (acesso total ao sistema)
+                        </option>
+                        <option value="superv_campo" {% if usuario_edicao and usuario_edicao.perfil == 'superv_campo' %}selected{% endif %}>
+                            👨‍💼 Supervisor de Campo (gerencia equipes)
+                        </option>
+                        <option value="superv_operacao" {% if usuario_edicao and usuario_edicao.perfil == 'superv_operacao' %}selected{% endif %}>
+                            👨‍💻 Supervisor de Operação (acompanhamento)
+                        </option>
+                        <option value="visualizador" {% if usuario_edicao and usuario_edicao.perfil == 'visualizador' %}selected{% endif %}>
+                            👀 Visualizador (apenas consulta)
+                        </option>
+                    </select>
+                    <small class="help-text">
+                        <strong>ADMIN:</strong> Acesso total | 
+                        <strong>Superv. Campo:</strong> Registra operações | 
+                        <strong>Superv. Operação:</strong> Acompanha | 
+                        <strong>Visualizador:</strong> Somente lê
+                    </small>
+                </div>
+
+                <!-- Base Responsável -->
+                <div class="form-group">
+                    <label for="base_responsavel">Base/Supervisão Responsável:</label>
+                    <input 
+                        type="text" 
+                        id="base_responsavel" 
+                        name="base_responsavel" 
+                        value="{{ usuario_edicao.base_responsavel if usuario_edicao else '' }}"
+                        placeholder="Ex: NAILTON, AFRANCISCO, JOSELITO, CHRISLEY"
+                        list="supervisores-lista"
+                    >
+                    <datalist id="supervisores-lista">
+                        {% for sup in supervisores %}
+                        <option value="{{ sup }}">
+                        {% endfor %}
+                    </datalist>
+                    <small class="help-text">
+                        Digite "Todas" para ADMIN. Para Supervisores, informe o nome da supervisão.<br>
+                        Supervisões disponíveis: NAILTON, AFRANCISCO, JOSELITO, CHRISLEY
+                    </small>
+                </div>
+
+                <!-- Status -->
+                <div class="form-group">
+                    <label>
+                        <input 
+                            type="checkbox" 
+                            name="ativo" 
+                            {% if not usuario_edicao or usuario_edicao.ativo %}checked{% endif %}
+                        >
+                        Usuário ativo (pode fazer login)
+                    </label>
+                </div>
+
+                <!-- Botões -->
+                <div class="form-actions">
+                    <a href="/usuarios" class="btn btn-secondary">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        {% if usuario_edicao %}💾 Salvar Alterações{% else %}➕ Criar Usuário{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Validar senhas iguais (apenas para novo usuário)
+        {% if not usuario_edicao %}
+        document.getElementById('form-usuario').addEventListener('submit', function(e) {
+            const senha = document.getElementById('senha').value;
+            const confirmacao = document.getElementById('senha_confirmacao').value;
+            
+            if (senha !== confirmacao) {
+                e.preventDefault();
+                alert('❌ As senhas não coincidem!');
+                return false;
+            }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
