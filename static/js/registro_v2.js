@@ -266,7 +266,11 @@ class RegistroV2 {
             
             debounceTimer = setTimeout(async () => {
                 try {
-                    const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}`);
+                    
+                    // Pegar data selecionada
+                    const dataRegistro = document.getElementById('data-registro').value;
+                    const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}&data=${dataRegistro}`);
+                    
                     const data = await response.json();
                     
                     this.mostrarResultadosRemanejamento(data.eletricistas, resultadoDiv);
@@ -404,7 +408,11 @@ class AutocompleteIndisponivel {
     
     async buscarEletricistas(termo) {
         try {
-            const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}`);
+            
+            // Pegar data selecionada
+            const dataRegistro = document.getElementById('data-registro').value;        
+            const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}&data=${dataRegistro}`);
+            
             const data = await response.json();
             
             this.mostrarSugestoes(data.eletricistas);
@@ -512,4 +520,5 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
