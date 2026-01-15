@@ -485,9 +485,24 @@ async function remanejarEletricista(id, nome, base) {
     }
 }
 
-// ==========================================
+// =============================================
+// CALENDÁRIO - FILTRO DE DATA
+// =============================================
+function inicializarCalendario() {
+    const dataInput = document.getElementById('data-registro');
+    if (dataInput) {
+        dataInput.addEventListener('change', function() {
+            const dataSelecionada = this.value;
+            // Recarregar página com nova data
+            window.location.href = `/registrar-v2?data=${dataSelecionada}`;
+        });
+    }
+}
+
+// =============================================
 // INICIALIZAR QUANDO PÁGINA CARREGAR
-// ==========================================
+// =============================================
 document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
+    inicializarCalendario(); // Inicializar filtro de data
 });
