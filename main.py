@@ -275,8 +275,12 @@ def processar_registro(
 # ========================================
 
 @app.get("/registrar-v2", response_class=HTMLResponse)
-def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
-    """Página de registro V2 - Interface dinâmica"""
+def registrar_v2_page(
+    request: Request, 
+    data: str = None,
+    db: Session = Depends(get_db)
+):
+    """Página de registro V2 - Interface dinâmica com filtro de data"""
     
     # Verificar se está logado
     if not verificar_autenticacao(request):
@@ -288,13 +292,20 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login")
     
     from models import EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
+    from datetime import datetime
     
-    # Data de hoje
-    hoje = date.today()
+    # Definir data (hoje ou data selecionada)
+    if data:
+        try:
+            data_selecionada = datetime.strptime(data, '%Y-%m-%d').date()
+        except:
+            data_selecionada = date.today()
+    else:
+        data_selecionada = date.today()
     
-    # Buscar IDs dos eletricistas já registrados HOJE
+    # Buscar IDs dos eletricistas já registrados na data selecionada
     eletricistas_ja_registrados = db.query(EquipeDia.eletricista_id).filter(
-        EquipeDia.data == hoje
+        EquipeDia.data == data_selecionada
     ).all()
     
     ids_ja_registrados = [e[0] for e in eletricistas_ja_registrados]
@@ -305,7 +316,7 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
     # Criar query base
     query = db.query(EstruturaEquipes)
     
-    # EXCLUIR eletricistas já registrados hoje
+    # EXCLUIR eletricistas já registrados na data selecionada
     if ids_ja_registrados:
         query = query.filter(~EstruturaEquipes.id.in_(ids_ja_registrados))
     
@@ -333,7 +344,11 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
         MotivoIndisponibilidade.descricao
     ).all()
     
-    hoje_formatado = hoje.strftime('%d/%m/%Y')
+    # Formatar datas
+    hoje_formatado = date.today().strftime('%d/%m/%Y')
+    hoje_iso = date.today().isoformat()
+    data_selecionada_iso = data_selecionada.isoformat()
+    data_selecionada_formatada = data_selecionada.strftime('%d/%m/%Y')
     
     return templates.TemplateResponse(
         "registrar_v2.html",
@@ -343,7 +358,10 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
             "eletricistas": eletricistas,
             "prefixos_supervisor": prefixos_supervisor,
             "motivos": motivos,
-            "hoje": hoje_formatado
+            "hoje": hoje_formatado,
+            "hoje_iso": hoje_iso,
+            "data_selecionada": data_selecionada_iso,
+            "data_selecionada_formatada": data_selecionada_formatada
         }
     )
 
@@ -870,6 +888,7 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
