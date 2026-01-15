@@ -457,4 +457,53 @@ body {
 .badge-fiscal {
     background: #f3e5f5;
     color: #7b1fa2;
+
+}
+
+/* Seletor de Data */
+.data-selector {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.data-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.data-header label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+#data-registro {
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 2px solid #3498db;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#data-registro:hover {
+    border-color: #2980b9;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+#data-registro:focus {
+    outline: none;
+    border-color: #2980b9;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.data-info {
+    font-size: 14px;
+    color: #7f8c8d;
+    font-style: italic;
 }
