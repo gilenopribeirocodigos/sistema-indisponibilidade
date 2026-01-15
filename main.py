@@ -741,6 +741,38 @@ def teste_eletricistas(db: Session = Depends(get_db)):
     except Exception as e:
         return JSONResponse({"erro": str(e)})
 
+@app.get("/api/listar-todos-eletricistas")
+def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
+    """Listar TODOS os eletricistas sem filtro"""
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    from models import EstruturaEquipes
+    
+    try:
+        eletricistas = db.query(EstruturaEquipes).all()
+        
+        resultado = []
+        for e in eletricistas:
+            resultado.append({
+                "id": e.id,
+                "colaborador": e.colaborador,
+                "matricula": e.matricula,
+                "prefixo": e.prefixo,
+                "base": e.base,
+                "polo": e.polo,
+                "regional": e.regional,
+                "superv_campo": e.superv_campo
+            })
+        
+        return JSONResponse({
+            "success": True,
+            "total": len(resultado),
+            "eletricistas": resultado
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "erro": str(e)})
+
 # ========================================
 # EXECUTAR SERVIDOR
 # ========================================
@@ -748,6 +780,7 @@ def teste_eletricistas(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
