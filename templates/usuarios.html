@@ -1,1 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Usuários</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/usuarios.css">
+</head>
+<body>
+    <div class="usuarios-container">
+        <!-- Header -->
+        <div class="header-usuarios">
+            <a href="/home" class="btn-voltar">← Voltar para Home</a>
+            <h1>👥 Gestão de Usuários</h1>
+            <div class="user-info-mini">
+                <span>{{ usuario.nome }}</span>
+                <span class="badge badge-{{ usuario.perfil.lower().replace('_', '-') }}">{{ usuario.perfil }}</span>
+            </div>
+        </div>
 
+        <!-- Mensagens -->
+        {% if erro %}
+        <div class="alert alert-erro">❌ {{ erro }}</div>
+        {% endif %}
+        
+        {% if sucesso %}
+        <div class="alert alert-sucesso">✅ {{ sucesso }}</div>
+        {% endif %}
+
+        <!-- Botão Novo Usuário -->
+        <div class="acoes-topo">
+            <a href="/usuarios/novo" class="btn btn-primary btn-lg">
+                ➕ Novo Usuário
+            </a>
+            <div class="stats">
+                <span class="stat-item">
+                    <strong>Total:</strong> {{ usuarios|length }} usuário(s)
+                </span>
+                <span class="stat-item">
+                    <strong>Ativos:</strong> {{ usuarios|selectattr("ativo")|list|length }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Tabela de Usuários -->
+        <div class="usuarios-tabela-container">
+            <table class="usuarios-tabela">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Login</th>
+                        <th>Perfil</th>
+                        <th>Base/Região</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in usuarios %}
+                    <tr class="{% if not user.ativo %}usuario-inativo{% endif %}">
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <strong>{{ user.nome }}</strong>
+                        </td>
+                        <td>{{ user.login }}</td>
+                        <td>
+                            <span class="badge badge-{{ user.perfil.lower().replace('_', '-') }}">
+                                {% if user.perfil == 'admin' %}
+                                    👑 ADMIN
+                                {% elif user.perfil == 'superv_campo' %}
+                                    👨‍💼 Superv. Campo
+                                {% elif user.perfil == 'superv_operacao' %}
+                                    👨‍💻 Superv. Operação
+                                {% elif user.perfil == 'visualizador' %}
+                                    👀 Visualizador
+                                {% else %}
+                                    {{ user.perfil }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ user.base_responsavel or '-' }}</td>
+                        <td>
+                            {% if user.ativo %}
+                                <span class="badge badge-ativo">✅ Ativo</span>
+                            {% else %}
+                                <span class="badge badge-inativo">⭕ Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="acoes-td">
+                            <a href="/usuarios/editar/{{ user.id }}" class="btn-acao btn-editar" title="Editar">
+                                ✏️
+                            </a>
+                            
+                            {% if user.ativo %}
+                                <button onclick="toggleStatus({{ user.id }}, false)" class="btn-acao btn-desativar" title="Desativar">
+                                    🔴
+                                </button>
+                            {% else %}
+                                <button onclick="toggleStatus({{ user.id }}, true)" class="btn-acao btn-ativar" title="Ativar">
+                                    🟢
+                                </button>
+                            {% endif %}
+                            
+                            <button onclick="resetarSenha({{ user.id }}, '{{ user.nome }}')" class="btn-acao btn-reset" title="Resetar Senha">
+                                🔑
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="footer-usuarios">
+            <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
+        </div>
+    </div>
+
+    <script src="/static/js/usuarios.js"></script>
+</body>
+</html>
