@@ -333,7 +333,11 @@ class RegistroV2 {
             try {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.disabled = true;
-                submitBtn.textContent = '⏳ Salvando...';
+                submitBtn.textContent = '⏳ Salvando...';                
+                
+                // Adicionar data ao FormData
+                const dataRegistro = document.getElementById('data-registro').value;
+                formData.append('data', dataRegistro);
                 
                 const response = await fetch('/api/salvar-indisponibilidade', {
                     method: 'POST',
@@ -520,5 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
 
