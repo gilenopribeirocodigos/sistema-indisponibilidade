@@ -686,8 +686,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
                     base=str(row.get('base', '')).strip(),
                     polo=str(row.get('polo', '')).strip(),
                     regional=str(row.get('regional', '')).strip(),
-                    superv_campo=str(row.get('superv_campo', '')).strip(),
-                    encarregado=str(row.get('coordenador', '')).strip()
+                    superv_campo=str(row.get('superv_campo', '')).strip()
                 )
                 batch.append(obj)
                 total += 1
@@ -726,6 +725,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
