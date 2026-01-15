@@ -287,22 +287,37 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
         request.session.clear()
         return RedirectResponse(url="/login")
     
-    from models import EstruturaEquipes, MotivoIndisponibilidade
+    from models import EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
+    
+    # Data de hoje
+    hoje = date.today()
+    
+    # Buscar IDs dos eletricistas já registrados HOJE
+    eletricistas_ja_registrados = db.query(EquipeDia.eletricista_id).filter(
+        EquipeDia.data == hoje
+    ).all()
+    
+    ids_ja_registrados = [e[0] for e in eletricistas_ja_registrados]
     
     # Buscar eletricistas
     supervisor_campo = usuario.base_responsavel
     
-    # Se for ADMIN ou base "Todas", mostra TODOS
+    # Criar query base
+    query = db.query(EstruturaEquipes)
+    
+    # EXCLUIR eletricistas já registrados hoje
+    if ids_ja_registrados:
+        query = query.filter(~EstruturaEquipes.id.in_(ids_ja_registrados))
+    
+    # Se for ADMIN ou base "Todas", mostra TODOS (que ainda não foram registrados)
     if not supervisor_campo or supervisor_campo.upper() == "TODAS":
-        eletricistas = db.query(EstruturaEquipes).order_by(
-            EstruturaEquipes.colaborador
-        ).all()
+        eletricistas = query.order_by(EstruturaEquipes.colaborador).all()
         
         # Buscar todos os prefixos únicos
         prefixos_supervisor = db.query(EstruturaEquipes.prefixo).distinct().all()
     else:
         # Senão, filtra pela supervisão específica
-        eletricistas = db.query(EstruturaEquipes).filter(
+        eletricistas = query.filter(
             EstruturaEquipes.superv_campo == supervisor_campo
         ).order_by(EstruturaEquipes.colaborador).all()
         
@@ -318,8 +333,7 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
         MotivoIndisponibilidade.descricao
     ).all()
     
-    # Data de hoje
-    hoje = date.today().strftime('%d/%m/%Y')
+    hoje_formatado = hoje.strftime('%d/%m/%Y')
     
     return templates.TemplateResponse(
         "registrar_v2.html",
@@ -329,7 +343,7 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
             "eletricistas": eletricistas,
             "prefixos_supervisor": prefixos_supervisor,
             "motivos": motivos,
-            "hoje": hoje
+            "hoje": hoje_formatado
         }
     )
 
@@ -784,6 +798,7 @@ def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
