@@ -289,23 +289,27 @@ def registrar_v2_page(request: Request, db: Session = Depends(get_db)):
     
     from models import EstruturaEquipes, MotivoIndisponibilidade
     
-    # Buscar APENAS eletricistas da supervisão do usuário
+    # Buscar eletricistas
     supervisor_campo = usuario.base_responsavel
     
-    if supervisor_campo:
+    # Se for ADMIN ou base "Todas", mostra TODOS
+    if not supervisor_campo or supervisor_campo.upper() == "TODAS":
+        eletricistas = db.query(EstruturaEquipes).order_by(
+            EstruturaEquipes.colaborador
+        ).all()
+        
+        # Buscar todos os prefixos únicos
+        prefixos_supervisor = db.query(EstruturaEquipes.prefixo).distinct().all()
+    else:
+        # Senão, filtra pela supervisão específica
         eletricistas = db.query(EstruturaEquipes).filter(
             EstruturaEquipes.superv_campo == supervisor_campo
         ).order_by(EstruturaEquipes.colaborador).all()
-    else:
-        # Se for ADMIN, mostra todos (ou ajuste conforme sua regra)
-        eletricistas = db.query(EstruturaEquipes).order_by(
-            EstruturaEquipes.colaborador
-        ).limit(50).all()
-    
-    # Buscar prefixos únicos da supervisão
-    prefixos_supervisor = db.query(EstruturaEquipes.prefixo).filter(
-        EstruturaEquipes.superv_campo == supervisor_campo
-    ).distinct().all() if supervisor_campo else []
+        
+        # Buscar prefixos da supervisão
+        prefixos_supervisor = db.query(EstruturaEquipes.prefixo).filter(
+            EstruturaEquipes.superv_campo == supervisor_campo
+        ).distinct().all()
     
     prefixos_supervisor = [p[0] for p in prefixos_supervisor if p[0]]
     
@@ -780,6 +784,7 @@ def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
