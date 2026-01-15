@@ -716,7 +716,30 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
             "erro": f"Erro: {str(e)}"
         })
 
-
+@app.get("/api/teste-eletricistas")
+def teste_eletricistas(db: Session = Depends(get_db)):
+    """Rota de teste para ver quantos eletricistas existem"""
+    from models import EstruturaEquipes
+    
+    try:
+        total = db.query(EstruturaEquipes).count()
+        todos = db.query(EstruturaEquipes).limit(5).all()
+        
+        resultado = []
+        for e in todos:
+            resultado.append({
+                "id": e.id,
+                "colaborador": e.colaborador,
+                "matricula": e.matricula,
+                "prefixo": e.prefixo
+            })
+        
+        return JSONResponse({
+            "total_no_banco": total,
+            "primeiros_5": resultado
+        })
+    except Exception as e:
+        return JSONResponse({"erro": str(e)})
 
 # ========================================
 # EXECUTAR SERVIDOR
@@ -725,6 +748,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
