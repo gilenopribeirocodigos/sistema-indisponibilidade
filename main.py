@@ -507,10 +507,6 @@ async def remanejar_eletricista(
 @app.post("/api/salvar-indisponibilidade")
 async def salvar_indisponibilidade(
     request: Request,
-    eletricista_id: int = Form(...),
-    prefixo: str = Form(...),
-    motivo_id: int = Form(...),
-    observacoes: str = Form(""),
     db: Session = Depends(get_db)
 ):
     """Salvar registro de indisponibilidade"""
@@ -524,8 +520,27 @@ async def salvar_indisponibilidade(
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
     from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade
+    from datetime import datetime
     
     try:
+        # Ler dados do formulário
+        form_data = await request.form()
+        
+        eletricista_id = form_data.get('eletricista_id')
+        prefixo = form_data.get('prefixo')
+        motivo_id = form_data.get('motivo_id')
+        observacoes = form_data.get('observacoes', '')
+        data_registro = form_data.get('data', None)
+        
+        # Definir data
+        if data_registro:
+            try:
+                data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
+            except:
+                data_obj = date.today()
+        else:
+            data_obj = date.today()
+        
         # Validar eletricista
         eletricista = db.query(EstruturaEquipes).filter(
             EstruturaEquipes.id == eletricista_id
@@ -543,10 +558,8 @@ async def salvar_indisponibilidade(
             return JSONResponse({"success": False, "erro": "Motivo inválido"})
         
         # Criar indisponibilidade
-        hoje = date.today()
-        
         nova_indisponibilidade = Indisponibilidade(
-            data=hoje,
+            data=data_obj,
             eletricista_id=eletricista_id,
             matricula=eletricista.matricula,
             prefixo=prefixo,
@@ -560,7 +573,8 @@ async def salvar_indisponibilidade(
         
         return JSONResponse({
             "success": True,
-            "mensagem": f"Indisponibilidade de {eletricista.colaborador} registrada com sucesso!"
+            "data": data_obj.strftime('%d/%m/%Y'),
+            "mensagem": f"Indisponibilidade de {eletricista.colaborador} registrada para {data_obj.strftime('%d/%m/%Y')}!"
         })
         
     except Exception as e:
@@ -939,6 +953,7 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
