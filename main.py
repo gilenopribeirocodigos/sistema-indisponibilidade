@@ -947,12 +947,346 @@ def criar_motivos_padrao(db: Session = Depends(get_db)):
         })
 
 # ========================================
+# ROTAS DE GESTÃO DE USUÁRIOS
+# ========================================
+
+@app.get("/usuarios", response_class=HTMLResponse)
+def listar_usuarios(request: Request, db: Session = Depends(get_db)):
+    """Listar todos os usuários (apenas ADMIN)"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        request.session.clear()
+        return RedirectResponse(url="/login")
+    
+    # Verificar se é ADMIN
+    if usuario.perfil != 'admin':
+        return templates.TemplateResponse(
+            "home.html",
+            {
+                "request": request,
+                "usuario": usuario,
+                "erro": "⚠️ Acesso negado! Apenas administradores podem gerenciar usuários."
+            }
+        )
+    
+    # Buscar todos os usuários
+    usuarios = db.query(Usuario).order_by(Usuario.nome).all()
+    
+    return templates.TemplateResponse(
+        "usuarios.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "usuarios": usuarios
+        }
+    )
+
+
+@app.get("/usuarios/novo", response_class=HTMLResponse)
+def novo_usuario_page(request: Request, db: Session = Depends(get_db)):
+    """Página para criar novo usuário"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        request.session.clear()
+        return RedirectResponse(url="/login")
+    
+    # Verificar se é ADMIN
+    if usuario.perfil != 'admin':
+        return RedirectResponse(url="/usuarios")
+    
+    # Buscar supervisores únicos da tabela estrutura_equipes
+    from models import EstruturaEquipes
+    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
+    supervisores = [s[0] for s in supervisores if s[0]]
+    supervisores.append("Todas")
+    
+    return templates.TemplateResponse(
+        "usuario_form.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "supervisores": supervisores,
+            "usuario_edicao": None
+        }
+    )
+
+
+@app.post("/usuarios/novo")
+def criar_usuario(
+    request: Request,
+    nome: str = Form(...),
+    login: str = Form(...),
+    senha: str = Form(...),
+    perfil: str = Form(...),
+    base_responsavel: str = Form(""),
+    ativo: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    """Criar novo usuário"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario_logado = get_usuario_logado(request, db)
+    if not usuario_logado or usuario_logado.perfil != 'admin':
+        return RedirectResponse(url="/usuarios")
+    
+    from auth import criar_hash_senha
+    from models import EstruturaEquipes
+    
+    try:
+        # Verificar se login já existe
+        existe = db.query(Usuario).filter(Usuario.login == login).first()
+        if existe:
+            supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
+            supervisores = [s[0] for s in supervisores if s[0]]
+            supervisores.append("Todas")
+            
+            return templates.TemplateResponse(
+                "usuario_form.html",
+                {
+                    "request": request,
+                    "usuario": usuario_logado,
+                    "supervisores": supervisores,
+                    "usuario_edicao": None,
+                    "erro": f"❌ Login '{login}' já existe! Escolha outro."
+                }
+            )
+        
+        # Criar novo usuário
+        novo_usuario = Usuario(
+            nome=nome,
+            login=login,
+            senha_hash=criar_hash_senha(senha),
+            perfil=perfil,
+            base_responsavel=base_responsavel if base_responsavel else None,
+            ativo=ativo
+        )
+        
+        db.add(novo_usuario)
+        db.commit()
+        
+        # Redirecionar com sucesso
+        return RedirectResponse(
+            url=f"/usuarios?sucesso=Usuário '{nome}' criado com sucesso!",
+            status_code=302
+        )
+        
+    except Exception as e:
+        db.rollback()
+        
+        supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
+        supervisores = [s[0] for s in supervisores if s[0]]
+        supervisores.append("Todas")
+        
+        return templates.TemplateResponse(
+            "usuario_form.html",
+            {
+                "request": request,
+                "usuario": usuario_logado,
+                "supervisores": supervisores,
+                "usuario_edicao": None,
+                "erro": f"❌ Erro ao criar usuário: {str(e)}"
+            }
+        )
+
+
+@app.get("/usuarios/editar/{user_id}", response_class=HTMLResponse)
+def editar_usuario_page(request: Request, user_id: int, db: Session = Depends(get_db)):
+    """Página para editar usuário"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        request.session.clear()
+        return RedirectResponse(url="/login")
+    
+    # Verificar se é ADMIN
+    if usuario.perfil != 'admin':
+        return RedirectResponse(url="/usuarios")
+    
+    # Buscar usuário a ser editado
+    usuario_edicao = db.query(Usuario).filter(Usuario.id == user_id).first()
+    
+    if not usuario_edicao:
+        return RedirectResponse(url="/usuarios?erro=Usuário não encontrado!")
+    
+    # Buscar supervisores
+    from models import EstruturaEquipes
+    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
+    supervisores = [s[0] for s in supervisores if s[0]]
+    supervisores.append("Todas")
+    
+    return templates.TemplateResponse(
+        "usuario_form.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "supervisores": supervisores,
+            "usuario_edicao": usuario_edicao
+        }
+    )
+
+
+@app.post("/usuarios/editar/{user_id}")
+def salvar_edicao_usuario(
+    request: Request,
+    user_id: int,
+    nome: str = Form(...),
+    perfil: str = Form(...),
+    base_responsavel: str = Form(""),
+    ativo: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    """Salvar edição de usuário"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario_logado = get_usuario_logado(request, db)
+    if not usuario_logado or usuario_logado.perfil != 'admin':
+        return RedirectResponse(url="/usuarios")
+    
+    try:
+        # Buscar usuário
+        usuario_edicao = db.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario_edicao:
+            return RedirectResponse(url="/usuarios?erro=Usuário não encontrado!")
+        
+        # Atualizar dados
+        usuario_edicao.nome = nome
+        usuario_edicao.perfil = perfil
+        usuario_edicao.base_responsavel = base_responsavel if base_responsavel else None
+        usuario_edicao.ativo = ativo
+        
+        db.commit()
+        
+        # Redirecionar com sucesso
+        return RedirectResponse(
+            url=f"/usuarios?sucesso=Usuário '{nome}' atualizado com sucesso!",
+            status_code=302
+        )
+        
+    except Exception as e:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/usuarios?erro=Erro ao atualizar usuário: {str(e)}",
+            status_code=302
+        )
+
+
+# ========================================
+# APIs DE GESTÃO DE USUÁRIOS
+# ========================================
+
+@app.post("/api/usuarios/toggle-status")
+async def toggle_status_usuario(request: Request, db: Session = Depends(get_db)):
+    """Ativar/Desativar usuário"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario_logado = get_usuario_logado(request, db)
+    if not usuario_logado or usuario_logado.perfil != 'admin':
+        return JSONResponse({"success": False, "erro": "Acesso negado"})
+    
+    try:
+        body = await request.json()
+        user_id = body.get('user_id')
+        ativo = body.get('ativo')
+        
+        # Buscar usuário
+        usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+        
+        # Não permitir desativar o próprio usuário
+        if usuario.id == usuario_logado.id:
+            return JSONResponse({"success": False, "erro": "Você não pode desativar sua própria conta!"})
+        
+        # Atualizar status
+        usuario.ativo = ativo
+        db.commit()
+        
+        acao = "ativado" if ativo else "desativado"
+        
+        return JSONResponse({
+            "success": True,
+            "mensagem": f"Usuário '{usuario.nome}' {acao} com sucesso!"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"success": False, "erro": str(e)})
+
+
+@app.post("/api/usuarios/resetar-senha")
+async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db)):
+    """Resetar senha de usuário"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario_logado = get_usuario_logado(request, db)
+    if not usuario_logado or usuario_logado.perfil != 'admin':
+        return JSONResponse({"success": False, "erro": "Acesso negado"})
+    
+    from auth import criar_hash_senha
+    
+    try:
+        body = await request.json()
+        user_id = body.get('user_id')
+        nova_senha = body.get('nova_senha')
+        
+        if not nova_senha or len(nova_senha) < 6:
+            return JSONResponse({"success": False, "erro": "Senha deve ter no mínimo 6 caracteres"})
+        
+        # Buscar usuário
+        usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+        
+        # Atualizar senha
+        usuario.senha_hash = criar_hash_senha(nova_senha)
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "mensagem": f"Senha de '{usuario.nome}' resetada com sucesso!"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"success": False, "erro": str(e)})
+
+# ========================================
 # EXECUTAR SERVIDOR
 # ========================================
 
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
