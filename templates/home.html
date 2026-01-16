@@ -158,24 +158,26 @@
             </a>
 
             <a href="/importar-csv" class="menu-card">
-                <div class="card-icon">📤</div>
+                <div class="menu-icon">📤</div>
                 <h3>Importar CSV</h3>
                 <p>Importar eletricistas de arquivo</p>
             </a>
+            
+            <!-- Card Gestão de Usuários (apenas para ADMIN) -->
+            {% if usuario.perfil == 'admin' %}
+            <a href="/usuarios" class="menu-card">
+                <div class="menu-icon">👥</div>
+                <h3>Gestão de Usuários</h3>
+                <p>Criar e gerenciar usuários do sistema</p>
+            </a>
+            {% endif %}
 
             <a href="/historico" class="menu-card">
                 <div class="menu-icon">📋</div>
                 <h3>Histórico</h3>
                 <p>Ver histórico de indisponibilidades</p>
             </a>
-
-            {% if usuario.perfil == 'ADMIN' %}
-            <a href="/admin" class="menu-card">
-                <div class="menu-icon">⚙️</div>
-                <h3>Administração</h3>
-                <p>Gerenciar usuários e configurações</p>
-            </a>
-            {% endif %}
+            
         </div>
 
         <!-- Rodapé -->
@@ -187,4 +189,5 @@
 </body>
 
 </html>
+
 
