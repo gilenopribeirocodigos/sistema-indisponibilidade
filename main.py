@@ -340,17 +340,17 @@ def registrar_v2_page(
             Remanejamento.data == data_selecionada
         ).all()
         
-        # 3. Criar dicionário de remanejamentos: {matricula: destino}
+        # 3. Criar dicionário de remanejamentos: {eletricista_id: destino}
         remanejamentos_dict = {}
         for r in remanejamentos_ativos:
-            remanejamentos_dict[r.matricula] = r.supervisor_destino
+            remanejamentos_dict[r.eletricista_id] = r.supervisor_destino
         
         # 4. FILTRAR eletricistas: REMOVER os remanejados PARA OUTRA BASE
         eletricistas_filtrados = []
         for elet in eletricistas_originais:
             # Se foi remanejado para outra base, NÃO mostrar
-            if elet.matricula in remanejamentos_dict:
-                if remanejamentos_dict[elet.matricula] != supervisor_campo:
+            if elet.id in remanejamentos_dict:
+                if remanejamentos_dict[elet.id] != supervisor_campo:
                     continue  # Pula (foi para outra base)
             eletricistas_filtrados.append(elet)
         
@@ -359,12 +359,12 @@ def registrar_v2_page(
             if r.supervisor_destino == supervisor_campo:
                 # Buscar dados do eletricista remanejado
                 elet_remanejado = db.query(EstruturaEquipes).filter(
-                    EstruturaEquipes.matricula == r.matricula
+                    EstruturaEquipes.id == r.eletricista_id
                 ).first()
                 
                 if elet_remanejado:
                     # Verificar se já não está na lista (evitar duplicatas)
-                    if not any(e.matricula == elet_remanejado.matricula for e in eletricistas_filtrados):
+                    if not any(e.id == elet_remanejado.id for e in eletricistas_filtrados):
                         eletricistas_filtrados.append(elet_remanejado)
         
         # Ordenar por nome
@@ -1325,6 +1325,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
