@@ -304,11 +304,25 @@ def registrar_v2_page(
         data_selecionada = date.today()
     
     # Buscar IDs dos eletricistas já registrados na data selecionada
-    eletricistas_ja_registrados = db.query(EquipeDia.eletricista_id).filter(
+    from models import Indisponibilidade
+    
+    # 1. Registrados na FREQUÊNCIA
+    ids_frequencia = db.query(EquipeDia.eletricista_id).filter(
         EquipeDia.data == data_selecionada
     ).all()
     
-    ids_ja_registrados = [e[0] for e in eletricistas_ja_registrados]
+    # 2. Registrados como INDISPONÍVEIS
+    ids_indisponivel = db.query(Indisponibilidade.eletricista_id).filter(
+        Indisponibilidade.data == data_selecionada
+    ).all()
+    
+    # 3. JUNTAR AMBOS (usar set para eliminar duplicatas)
+    ids_ja_registrados = set()
+    ids_ja_registrados.update([i[0] for i in ids_frequencia])
+    ids_ja_registrados.update([i[0] for i in ids_indisponivel])
+    
+    # Converter de volta para lista
+    ids_ja_registrados = list(ids_ja_registrados)
     
     # Buscar eletricistas CONSIDERANDO REMANEJAMENTOS
     supervisor_campo = usuario.base_responsavel
@@ -1325,6 +1339,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
