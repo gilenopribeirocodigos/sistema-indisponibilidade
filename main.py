@@ -337,7 +337,7 @@ def registrar_v2_page(
         
         # 2. Buscar remanejamentos ATIVOS para a data selecionada
         remanejamentos_ativos = db.query(Remanejamento).filter(
-            Remanejamento.data_remanejamento == data_selecionada
+            Remanejamento.data == data_selecionada
         ).all()
         
         # 3. Criar dicionário de remanejamentos: {matricula: destino}
@@ -1325,6 +1325,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
