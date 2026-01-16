@@ -310,7 +310,7 @@ def registrar_v2_page(
     
     ids_ja_registrados = [e[0] for e in eletricistas_ja_registrados]
     
-    # Buscar eletricistas
+    # Buscar eletricistas CONSIDERANDO REMANEJAMENTOS
     supervisor_campo = usuario.base_responsavel
     
     # Criar query base
@@ -327,10 +327,49 @@ def registrar_v2_page(
         # Buscar todos os prefixos únicos
         prefixos_supervisor = db.query(EstruturaEquipes.prefixo).distinct().all()
     else:
-        # Senão, filtra pela supervisão específica
-        eletricistas = query.filter(
+        # PARA SUPERVISORES: CONSIDERAR REMANEJAMENTOS ATIVOS
+        from models import Remanejamento
+        
+        # 1. Buscar eletricistas ORIGINAIS da supervisão
+        eletricistas_originais = query.filter(
             EstruturaEquipes.superv_campo == supervisor_campo
-        ).order_by(EstruturaEquipes.colaborador).all()
+        ).all()
+        
+        # 2. Buscar remanejamentos ATIVOS para a data selecionada
+        remanejamentos_ativos = db.query(Remanejamento).filter(
+            Remanejamento.data_remanejamento == data_selecionada
+        ).all()
+        
+        # 3. Criar dicionário de remanejamentos: {matricula: destino}
+        remanejamentos_dict = {}
+        for r in remanejamentos_ativos:
+            remanejamentos_dict[r.matricula] = r.superv_destino
+        
+        # 4. FILTRAR eletricistas: REMOVER os remanejados PARA OUTRA BASE
+        eletricistas_filtrados = []
+        for elet in eletricistas_originais:
+            # Se foi remanejado para outra base, NÃO mostrar
+            if elet.matricula in remanejamentos_dict:
+                if remanejamentos_dict[elet.matricula] != supervisor_campo:
+                    continue  # Pula (foi para outra base)
+            eletricistas_filtrados.append(elet)
+        
+        # 5. ADICIONAR eletricistas que foram REMANEJADOS PARA ESTA BASE
+        for r in remanejamentos_ativos:
+            if r.superv_destino == supervisor_campo:
+                # Buscar dados do eletricista remanejado
+                elet_remanejado = db.query(EstruturaEquipes).filter(
+                    EstruturaEquipes.matricula == r.matricula
+                ).first()
+                
+                if elet_remanejado:
+                    # Verificar se já não está na lista (evitar duplicatas)
+                    if not any(e.matricula == elet_remanejado.matricula for e in eletricistas_filtrados):
+                        eletricistas_filtrados.append(elet_remanejado)
+        
+        # Ordenar por nome
+        eletricistas_filtrados.sort(key=lambda x: x.colaborador)
+        eletricistas = eletricistas_filtrados
         
         # Buscar prefixos da supervisão
         prefixos_supervisor = db.query(EstruturaEquipes.prefixo).filter(
@@ -1286,6 +1325,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
