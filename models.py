@@ -100,8 +100,8 @@ class Remanejamento(Base):
     id = Column(Integer, primary_key=True, index=True)
     eletricista_id = Column(Integer, ForeignKey("estrutura_equipes.id"), nullable=False)
     supervisor_origem = Column(String, nullable=False)
-    supervisor_destino = Column(String, nullable=False)
-    data = Column(Date, nullable=False)
+    supervisor_destino = Column(String, nullable=False)    
+    data_remanejamento = Column(Date, nullable=False)
     temporario = Column(Boolean, default=True)
     usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
     criado_em = Column(DateTime, server_default=func.now())
@@ -114,3 +114,4 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
