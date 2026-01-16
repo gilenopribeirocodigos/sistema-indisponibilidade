@@ -343,7 +343,7 @@ def registrar_v2_page(
         # 3. Criar dicionário de remanejamentos: {matricula: destino}
         remanejamentos_dict = {}
         for r in remanejamentos_ativos:
-            remanejamentos_dict[r.matricula] = r.superv_destino
+            remanejamentos_dict[r.matricula] = r.supervisor_destino
         
         # 4. FILTRAR eletricistas: REMOVER os remanejados PARA OUTRA BASE
         eletricistas_filtrados = []
@@ -356,7 +356,7 @@ def registrar_v2_page(
         
         # 5. ADICIONAR eletricistas que foram REMANEJADOS PARA ESTA BASE
         for r in remanejamentos_ativos:
-            if r.superv_destino == supervisor_campo:
+            if r.supervisor_destino == supervisor_campo:
                 # Buscar dados do eletricista remanejado
                 elet_remanejado = db.query(EstruturaEquipes).filter(
                     EstruturaEquipes.matricula == r.matricula
@@ -1325,6 +1325,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
