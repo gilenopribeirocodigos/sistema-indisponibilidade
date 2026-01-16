@@ -366,11 +366,15 @@ def registrar_v2_page(
             if elet.id in remanejamentos_dict:
                 if remanejamentos_dict[elet.id] != supervisor_campo:
                     continue  # Pula (foi para outra base)
-            eletricistas_filtrados.append(elet)
+            eletricistas_filtrados.append(elet)        
         
         # 5. ADICIONAR eletricistas que foram REMANEJADOS PARA ESTA BASE
         for r in remanejamentos_ativos:
             if r.supervisor_destino == supervisor_campo:
+                # ✅ NÃO adicionar se já foi registrado (Frequência ou Indisponibilidade)
+                if r.eletricista_id in ids_ja_registrados:
+                    continue  # Pula este eletricista
+                
                 # Buscar dados do eletricista remanejado
                 elet_remanejado = db.query(EstruturaEquipes).filter(
                     EstruturaEquipes.id == r.eletricista_id
@@ -1351,6 +1355,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
