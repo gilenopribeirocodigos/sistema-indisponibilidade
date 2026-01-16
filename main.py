@@ -572,7 +572,7 @@ async def salvar_indisponibilidade(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade
+    from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
     from datetime import datetime
     
     try:
@@ -1351,6 +1351,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
