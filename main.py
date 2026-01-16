@@ -601,6 +601,31 @@ async def salvar_indisponibilidade(
         
         if not eletricista:
             return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
+
+        # ✅ ADICIONAR ESTA VALIDAÇÃO AQUI:
+        # Verificar se já foi registrado na FREQUÊNCIA hoje
+        ja_na_frequencia = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista_id,
+            EquipeDia.data == data_obj
+        ).first()
+        
+        if ja_na_frequencia:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ {eletricista.colaborador} já foi registrado na FREQUÊNCIA hoje! Não pode ser marcado como indisponível."
+            })
+        
+        # Verificar se já foi registrado como INDISPONÍVEL hoje
+        ja_indisponivel = db.query(Indisponibilidade).filter(
+            Indisponibilidade.eletricista_id == eletricista_id,
+            Indisponibilidade.data == data_obj
+        ).first()
+        
+        if ja_indisponivel:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ {eletricista.colaborador} já foi registrado como INDISPONÍVEL hoje!"
+            })
         
         # Validar motivo
         motivo = db.query(MotivoIndisponibilidade).filter(
@@ -650,9 +675,9 @@ def buscar_eletricistas(
 ):
     """
     API para buscar eletricistas por nome.
-    Exclui eletricistas já registrados na data especificada.
+    Para INDISPONIBILIDADE: exclui apenas os já registrados como indisponíveis.
     """
-    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, Remanejamento
+    from models import EstruturaEquipes, Indisponibilidade
     from datetime import datetime
     
     # Verificar se tem termo de busca
@@ -668,34 +693,22 @@ def buscar_eletricistas(
     else:
         data_obj = date.today()
     
-    # Buscar IDs dos eletricistas já registrados na data
-    # 1. Registrados na Frequência (EquipeDia)
-    ids_frequencia = db.query(EquipeDia.eletricista_id).filter(
-        EquipeDia.data == data_obj
-    ).all()
+    # IMPORTANTE: Para busca de INDISPONIBILIDADE, 
+    # EXCLUIR APENAS os já registrados como INDISPONÍVEIS
+    # (não excluir os da frequência, pois eles podem ficar indisponíveis)
     
-    # 2. Registrados como Indisponíveis
     ids_indisponivel = db.query(Indisponibilidade.eletricista_id).filter(
         Indisponibilidade.data == data_obj
     ).all()
     
-    # 3. Remanejados
-    ids_remanejado = db.query(Remanejamento.eletricista_id).filter(
-        Remanejamento.data == data_obj
-    ).all()
+    ids_ja_registrados = [i[0] for i in ids_indisponivel]
     
-    # Juntar todos os IDs (usar set para eliminar duplicatas)
-    ids_ja_registrados = set()
-    ids_ja_registrados.update([i[0] for i in ids_frequencia])
-    ids_ja_registrados.update([i[0] for i in ids_indisponivel])
-    ids_ja_registrados.update([i[0] for i in ids_remanejado])
-    
-    # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados
+    # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados como indisponíveis
     query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%")
     )
     
-    # EXCLUIR eletricistas já registrados
+    # EXCLUIR apenas os já registrados como INDISPONÍVEIS
     if ids_ja_registrados:
         query = query.filter(~EstruturaEquipes.id.in_(ids_ja_registrados))
     
@@ -715,7 +728,6 @@ def buscar_eletricistas(
         })
     
     return JSONResponse({"eletricistas": resultado})
-
 
 @app.get("/api/buscar-prefixos")
 def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
@@ -1339,6 +1351,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
