@@ -254,9 +254,6 @@ class RegistroV2 {
         
         if (!inputBusca) return;
         
-        // ✅ SALVAR CONTEXTO
-        const self = this;
-        
         inputBusca.addEventListener('input', (e) => {
             const termo = e.target.value.trim();
             
@@ -275,26 +272,37 @@ class RegistroV2 {
                     // DEBUG
                     const apiUrl = `/api/buscar-eletricistas-remanejar?q=${encodeURIComponent(termo)}&data=${dataRegistro}`;
                     console.log('🔍 [REMANEJAR] Buscando em:', apiUrl);
-                    console.log('📅 [REMANEJAR] Data:', dataRegistro);
-                    console.log('🔤 [REMANEJAR] Termo:', termo);
+                    console.log('📊 [REMANEJAR] Data:', dataRegistro);
                     
                     const response = await fetch(apiUrl);
-                    console.log('📡 [REMANEJAR] Status HTTP:', response.status);
-                    
                     const data = await response.json();
-                    console.log('📊 [REMANEJAR] Total de resultados:', data.eletricistas.length);
-                    console.log('👥 [REMANEJAR] Eletricistas:', data.eletricistas);
                     
-                    // ✅ USAR self EM VEZ DE this
-                    self.mostrarResultadosRemanejamento(data.eletricistas, resultadoDiv);
+                    console.log('✅ [REMANEJAR] Total de resultados:', data.eletricistas.length);
+                    
+                    // ✅ MOSTRAR RESULTADOS DIRETAMENTE (SEM CHAMAR FUNÇÃO SEPARADA)
+                    if (data.eletricistas.length === 0) {
+                        resultadoDiv.innerHTML = '<p style="color: #999;">Nenhum eletricista encontrado</p>';
+                    } else {
+                        resultadoDiv.innerHTML = data.eletricistas.map(elet => `
+                            <div class="resultado-item" style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 2px solid #e0e0e0;">
+                                <div style="margin-bottom: 10px;">
+                                    <strong>${elet.nome}</strong><br>
+                                    <small>Mat: ${elet.matricula} | Base: ${elet.base} | Supervisor: ${elet.polo || 'N/A'}</small>
+                                </div>
+                                <button class="btn btn-primary" onclick="remanejarEletricista(${elet.id}, '${elet.nome}', '${elet.base}')">
+                                    🔄 Remanejar para Minha Supervisão
+                                </button>
+                            </div>
+                        `).join('');
+                    }
                     
                 } catch (error) {
-                    console.error('❌ [REMANEJAR] Erro ao buscar:', error);
+                    console.error('❌ [REMANEJAR] Erro:', error);
+                    resultadoDiv.innerHTML = '<p style="color: red;">❌ Erro ao buscar eletricistas</p>';
                 }
             }, 300);
         });
     }
-
     
     // ==========================================
     // SEÇÃO 3: INDISPONÍVEL
@@ -519,6 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
 
 
