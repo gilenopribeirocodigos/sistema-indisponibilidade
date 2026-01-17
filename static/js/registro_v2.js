@@ -415,7 +415,7 @@ class AutocompleteIndisponivel {
             
             // Pegar data selecionada
             const dataRegistro = document.getElementById('data-registro').value;        
-            const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}&data=${dataRegistro}`);
+            const response = await fetch(`/api/buscar-eletricistas-remanejar?q=${encodeURIComponent(termo)}&data=${dataRegistro}`);
             
             const data = await response.json();
             
@@ -524,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
 
 
