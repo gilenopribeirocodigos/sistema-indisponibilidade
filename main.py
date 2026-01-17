@@ -503,7 +503,7 @@ async def remanejar_eletricista(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import Remanejamento, EstruturaEquipes
+    from models import Remanejamento, EstruturaEquipes, EquipeDia, Indisponibilidade
     
     try:
         # Ler JSON do body
@@ -521,21 +521,58 @@ async def remanejar_eletricista(
         if not eletricista:
             return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
         
-        # Verificar se já foi remanejado hoje
         hoje = date.today()
-        ja_remanejado = db.query(Remanejamento).filter(
-            Remanejamento.eletricista_id == eletricista_id,
-            Remanejamento.data == hoje,
-            Remanejamento.supervisor_destino == usuario.base_responsavel
+        
+        # ✅ VALIDAÇÃO 1: Verificar se já está na FREQUÊNCIA
+        ja_na_frequencia = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista_id,
+            EquipeDia.data == hoje
         ).first()
         
-        if ja_remanejado:
+        if ja_na_frequencia:
             return JSONResponse({
                 "success": False,
-                "erro": "Eletricista já foi remanejado hoje para sua supervisão"
+                "erro": f"❌ {eletricista.colaborador} já foi registrado na FREQUÊNCIA hoje! Não pode ser remanejado."
             })
         
-        # Criar remanejamento
+        # ✅ VALIDAÇÃO 2: Verificar se já está INDISPONÍVEL
+        ja_indisponivel = db.query(Indisponibilidade).filter(
+            Indisponibilidade.eletricista_id == eletricista_id,
+            Indisponibilidade.data == hoje
+        ).first()
+        
+        if ja_indisponivel:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ {eletricista.colaborador} já foi registrado como INDISPONÍVEL hoje! Não pode ser remanejado."
+            })
+        
+        # ✅ VALIDAÇÃO 3: Verificar se já existe remanejamento
+        remanejamento_existente = db.query(Remanejamento).filter(
+            Remanejamento.eletricista_id == eletricista_id,
+            Remanejamento.data == hoje
+        ).first()
+        
+        if remanejamento_existente:
+            # Se já está remanejado para ESTA supervisão
+            if remanejamento_existente.supervisor_destino == usuario.base_responsavel:
+                return JSONResponse({
+                    "success": False,
+                    "erro": f"❌ {eletricista.colaborador} já está remanejado para sua supervisão!"
+                })
+            
+            # Se está remanejado para OUTRA supervisão → ATUALIZAR
+            supervisor_anterior = remanejamento_existente.supervisor_destino
+            remanejamento_existente.supervisor_destino = usuario.base_responsavel or usuario.nome
+            remanejamento_existente.usuario_registro = usuario.id
+            db.commit()
+            
+            return JSONResponse({
+                "success": True,
+                "mensagem": f"✅ {eletricista.colaborador} remanejado de {supervisor_anterior} para sua supervisão!"
+            })
+        
+        # ✅ CRIAR NOVO REMANEJAMENTO
         novo_remanejamento = Remanejamento(
             eletricista_id=eletricista_id,
             supervisor_origem=eletricista.superv_campo,
@@ -550,7 +587,7 @@ async def remanejar_eletricista(
         
         return JSONResponse({
             "success": True,
-            "mensagem": f"Eletricista {eletricista.colaborador} remanejado com sucesso!"
+            "mensagem": f"✅ {eletricista.colaborador} remanejado de {eletricista.superv_campo} para sua supervisão!"
         })
         
     except Exception as e:
@@ -729,6 +766,78 @@ def buscar_eletricistas(
             "prefixo": elet.prefixo,
             "polo": elet.polo,
             "regional": elet.regional
+        })
+    
+    return JSONResponse({"eletricistas": resultado})
+
+@app.get("/api/buscar-eletricistas-remanejar")
+def buscar_eletricistas_remanejar(
+    q: str = "", 
+    data: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    API para buscar eletricistas para REMANEJAMENTO.
+    Exclui apenas os já registrados em Frequência ou Indisponibilidade.
+    NÃO exclui os já remanejados (para permitir atualização).
+    """
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade
+    from datetime import datetime
+    
+    # Verificar se tem termo de busca
+    if not q or len(q) < 3:
+        return JSONResponse({"eletricistas": []})
+    
+    # Definir data (hoje ou data informada)
+    if data:
+        try:
+            data_obj = datetime.strptime(data, '%Y-%m-%d').date()
+        except:
+            data_obj = date.today()
+    else:
+        data_obj = date.today()
+    
+    # Buscar IDs dos eletricistas que NÃO podem ser remanejados
+    # 1. Registrados na FREQUÊNCIA (qualquer base)
+    ids_frequencia = db.query(EquipeDia.eletricista_id).filter(
+        EquipeDia.data == data_obj
+    ).all()
+    
+    # 2. Registrados como INDISPONÍVEIS (qualquer base)
+    ids_indisponivel = db.query(Indisponibilidade.eletricista_id).filter(
+        Indisponibilidade.data == data_obj
+    ).all()
+    
+    # Juntar IDs (NÃO incluir remanejamentos aqui!)
+    ids_bloqueados = set()
+    ids_bloqueados.update([i[0] for i in ids_frequencia])
+    ids_bloqueados.update([i[0] for i in ids_indisponivel])
+    
+    ids_bloqueados = list(ids_bloqueados)
+    
+    # Buscar eletricistas (case-insensitive) EXCLUINDO os bloqueados
+    query = db.query(EstruturaEquipes).filter(
+        EstruturaEquipes.colaborador.ilike(f"%{q}%")
+    )
+    
+    # EXCLUIR apenas os em Frequência ou Indisponíveis
+    if ids_bloqueados:
+        query = query.filter(~EstruturaEquipes.id.in_(ids_bloqueados))
+    
+    eletricistas = query.limit(10).all()
+    
+    # Formatar resultado
+    resultado = []
+    for elet in eletricistas:
+        resultado.append({
+            "id": elet.id,
+            "nome": elet.colaborador,
+            "matricula": elet.matricula,
+            "base": elet.base,
+            "prefixo": elet.prefixo,
+            "polo": elet.polo,
+            "regional": elet.regional,
+            "superv_original": elet.superv_campo
         })
     
     return JSONResponse({"eletricistas": resultado})
@@ -1355,6 +1464,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
