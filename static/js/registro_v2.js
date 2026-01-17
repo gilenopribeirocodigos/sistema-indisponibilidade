@@ -242,7 +242,7 @@ class RegistroV2 {
                 this.atualizarListaAssociacoes();
             });
         });
-    }
+    }    
     
     // ==========================================
     // SEÇÃO 2: REMANEJADO
@@ -253,6 +253,9 @@ class RegistroV2 {
         let debounceTimer = null;
         
         if (!inputBusca) return;
+        
+        // ✅ SALVAR CONTEXTO
+        const self = this;
         
         inputBusca.addEventListener('input', (e) => {
             const termo = e.target.value.trim();
@@ -269,24 +272,21 @@ class RegistroV2 {
                     // Pegar data selecionada
                     const dataRegistro = document.getElementById('data-registro').value;
                     
-                    // ✅ DEBUG: Mostrar URL completa
+                    // DEBUG
                     const apiUrl = `/api/buscar-eletricistas-remanejar?q=${encodeURIComponent(termo)}&data=${dataRegistro}`;
                     console.log('🔍 [REMANEJAR] Buscando em:', apiUrl);
                     console.log('📅 [REMANEJAR] Data:', dataRegistro);
                     console.log('🔤 [REMANEJAR] Termo:', termo);
                     
                     const response = await fetch(apiUrl);
-                    
-                    // ✅ DEBUG: Verificar status da resposta
                     console.log('📡 [REMANEJAR] Status HTTP:', response.status);
                     
                     const data = await response.json();
-                    
-                    // ✅ DEBUG: Mostrar quantos resultados vieram
                     console.log('📊 [REMANEJAR] Total de resultados:', data.eletricistas.length);
                     console.log('👥 [REMANEJAR] Eletricistas:', data.eletricistas);
                     
-                    this.mostrarResultadosRemanejamento(data.eletricistas, resultadoDiv);
+                    // ✅ USAR self EM VEZ DE this
+                    self.mostrarResultadosRemanejamento(data.eletricistas, resultadoDiv);
                     
                 } catch (error) {
                     console.error('❌ [REMANEJAR] Erro ao buscar:', error);
@@ -519,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
 
 
