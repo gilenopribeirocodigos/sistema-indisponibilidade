@@ -205,6 +205,40 @@
                         >
                     </div>
                     
+                    <!-- NOVO: Tipo de Indisponibilidade -->
+                    <div class="form-group">
+                        <label>Tipo de Indisponibilidade: *</label>
+                        <div class="tipo-indisponibilidade-group">
+                            <label class="radio-option">
+                                <input 
+                                    type="radio" 
+                                    name="tipo_indisponibilidade" 
+                                    value="parcial" 
+                                    required
+                                >
+                                <span class="radio-label">
+                                    <span class="radio-icon">🕐</span>
+                                    <strong>Parcial</strong>
+                                    <small>Apenas um turno (manhã ou tarde)</small>
+                                </span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input 
+                                    type="radio" 
+                                    name="tipo_indisponibilidade" 
+                                    value="total" 
+                                    required
+                                >
+                                <span class="radio-label">
+                                    <span class="radio-icon">🕛</span>
+                                    <strong>Total</strong>
+                                    <small>O dia inteiro</small>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="motivo-indisponivel">Motivo: *</label>
                         <select id="motivo-indisponivel" name="motivo_id" required>
@@ -243,5 +277,3 @@
 </body>
 
 </html>
-
-
