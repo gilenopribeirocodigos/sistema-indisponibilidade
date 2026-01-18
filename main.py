@@ -329,6 +329,11 @@ def registrar_v2_page(
     
     # Criar query base
     query = db.query(EstruturaEquipes)
+
+    # ✅ FILTRAR APENAS ATIVOS E RESERVAS
+    query = query.filter(
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+    )  
     
     # EXCLUIR eletricistas já registrados na data selecionada
     if ids_ja_registrados:
@@ -758,7 +763,8 @@ def buscar_eletricistas(
     
     # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados como indisponíveis
     query = db.query(EstruturaEquipes).filter(
-        EstruturaEquipes.colaborador.ilike(f"%{q}%")
+        EstruturaEquipes.colaborador.ilike(f"%{q}%"),        
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
     )
     
     # EXCLUIR apenas os já registrados como INDISPONÍVEIS
@@ -829,7 +835,8 @@ def buscar_eletricistas_remanejar(
     
     # Buscar eletricistas (case-insensitive) EXCLUINDO os bloqueados
     query = db.query(EstruturaEquipes).filter(
-        EstruturaEquipes.colaborador.ilike(f"%{q}%")
+        EstruturaEquipes.colaborador.ilike(f"%{q}%"),
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
     )
     
     # EXCLUIR apenas os em Frequência ou Indisponíveis
@@ -937,7 +944,7 @@ def importar_csv_page(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/api/importar-eletricistas")
 async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Importar eletricistas de arquivo CSV"""
+    """Importar eletricistas de arquivo CSV com UPSERT (preserva IDs)"""
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
     
@@ -958,46 +965,68 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
         # Ler CSV
         csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
         
-        # LIMPAR TABELA ANTES (CUIDADO!)
-        db.query(EstruturaEquipes).delete()
-        db.commit()
-        
-        total = 0
-        batch = []
+        # Contadores
+        total_novos = 0
+        total_atualizados = 0
         
         for row in csv_reader:
             matricula = str(row.get('matricula', '')).strip()
             colaborador = str(row.get('colaborador', '')).strip()
             
-            if matricula and colaborador:
-                obj = EstruturaEquipes(
+            if not matricula or not colaborador:
+                continue  # Pula linhas inválidas
+            
+            # Buscar se já existe no banco (pela matrícula)
+            eletricista_existente = db.query(EstruturaEquipes).filter(
+                EstruturaEquipes.matricula == matricula
+            ).first()
+            
+            if eletricista_existente:
+                # ✅ ATUALIZAR (mantém o ID)
+                eletricista_existente.colaborador = colaborador
+                eletricista_existente.prefixo = str(row.get('prefixo', '')).strip()
+                eletricista_existente.base = str(row.get('base', '')).strip()
+                eletricista_existente.polo = str(row.get('polo', '')).strip()
+                eletricista_existente.regional = str(row.get('regional', '')).strip()
+                eletricista_existente.superv_campo = str(row.get('superv_campo', '')).strip()
+                eletricista_existente.superv_operacao = str(row.get('superv_operacao', '')).strip()
+                eletricista_existente.coordenador = str(row.get('coordenador', '')).strip()
+                eletricista_existente.descr_secao = str(row.get('descr_secao', '')).strip()
+                eletricista_existente.descr_situacao = str(row.get('descr_situacao', '')).strip()  # ← ATUALIZA STATUS
+                eletricista_existente.placas = str(row.get('placas', '')).strip()
+                eletricista_existente.tipo_equipe = str(row.get('tipo_equipe', '')).strip()
+                eletricista_existente.processo_equipe = str(row.get('processo_equipe', '')).strip()
+                
+                total_atualizados += 1
+            else:
+                # ✅ INSERIR NOVO
+                novo_eletricista = EstruturaEquipes(
                     colaborador=colaborador,
                     matricula=matricula,
                     prefixo=str(row.get('prefixo', '')).strip(),
                     base=str(row.get('base', '')).strip(),
                     polo=str(row.get('polo', '')).strip(),
                     regional=str(row.get('regional', '')).strip(),
-                    superv_campo=str(row.get('superv_campo', '')).strip()
+                    superv_campo=str(row.get('superv_campo', '')).strip(),
+                    superv_operacao=str(row.get('superv_operacao', '')).strip(),
+                    coordenador=str(row.get('coordenador', '')).strip(),
+                    descr_secao=str(row.get('descr_secao', '')).strip(),
+                    descr_situacao=str(row.get('descr_situacao', '')).strip(),  # ← STATUS DO CSV
+                    placas=str(row.get('placas', '')).strip(),
+                    tipo_equipe=str(row.get('tipo_equipe', '')).strip(),
+                    processo_equipe=str(row.get('processo_equipe', '')).strip()
                 )
-                batch.append(obj)
-                total += 1
-                
-                # Inserir em lotes de 50
-                if len(batch) >= 50:
-                    db.bulk_save_objects(batch)
-                    db.commit()
-                    batch = []
+                db.add(novo_eletricista)
+                total_novos += 1
         
-        # Inserir restante
-        if batch:
-            db.bulk_save_objects(batch)
-            db.commit()
+        # Commit
+        db.commit()
         
         return JSONResponse({
             "success": True,
-            "total_novos": total,
-            "total_atualizados": 0,
-            "mensagem": f"✅ {total} eletricistas importados!"
+            "total_novos": total_novos,
+            "total_atualizados": total_atualizados,
+            "mensagem": f"✅ Importação concluída! {total_novos} novos, {total_atualizados} atualizados."
         })
         
     except Exception as e:
@@ -1476,6 +1505,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
