@@ -70,7 +70,7 @@
     margin-right: 5px;
 }
 
-/* Tabela */
+/* Tabela - Desktop */
 .usuarios-tabela-container {
     background: white;
     border-radius: 15px;
@@ -116,6 +116,78 @@
     font-size: 14px;
 }
 
+/* Cards para Mobile */
+.usuarios-cards {
+    display: none;
+}
+
+.usuario-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.usuario-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.usuario-card-nome {
+    flex: 1;
+}
+
+.usuario-card-nome strong {
+    font-size: 18px;
+    color: #333;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.usuario-card-nome small {
+    color: #666;
+    font-size: 14px;
+}
+
+.usuario-card-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #999;
+    font-weight: 600;
+    margin-bottom: 5px;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 14px;
+    color: #333;
+}
+
+.usuario-card-acoes {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding-top: 15px;
+    border-top: 2px solid #f0f0f0;
+}
+
 /* Badges */
 .badge {
     display: inline-block;
@@ -132,8 +204,18 @@
     color: white;
 }
 
-.badge-supervisor {
+.badge-superv-campo {
     background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.badge-superv-operacao {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}
+
+.badge-visualizador {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
     color: white;
 }
 
@@ -201,6 +283,33 @@
 .btn-reset:hover {
     background: #6c5ce7;
     transform: scale(1.1);
+}
+
+/* Botões gerais */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-lg {
+    padding: 12px 30px;
+    font-size: 16px;
 }
 
 /* Formulário */
@@ -273,12 +382,34 @@
     font-size: 14px;
 }
 
-/* Responsivo */
+/* ==========================================
+   RESPONSIVO - MOBILE
+========================================== */
+
 @media (max-width: 768px) {
-    .usuarios-tabela-container {
-        overflow-x: auto;
+    /* Container */
+    .usuarios-container {
+        padding: 10px;
     }
     
+    /* Header */
+    .header-usuarios {
+        flex-direction: column;
+        padding: 20px;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .header-usuarios h1 {
+        font-size: 24px;
+    }
+    
+    .btn-voltar {
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* Ações Topo */
     .acoes-topo {
         flex-direction: column;
         align-items: stretch;
@@ -286,26 +417,48 @@
     
     .stats {
         flex-direction: column;
+        width: 100%;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    /* Esconder tabela no mobile */
+    .usuarios-tabela-container {
+        display: none;
+    }
+    
+    /* Mostrar cards no mobile */
+    .usuarios-cards {
+        display: block;
+    }
+    
+    /* Formulário */
+    .form-card {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
     }
 }
 
-/* Badges por perfil */
-.badge-admin {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-}
-
-.badge-superv-campo {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-}
-
-.badge-superv-operacao {
-    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-    color: white;
-}
-
-.badge-visualizador {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    color: white;
+/* Tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .usuarios-tabela th,
+    .usuarios-tabela td {
+        padding: 10px;
+        font-size: 13px;
+    }
+    
+    .btn-acao {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
 }
