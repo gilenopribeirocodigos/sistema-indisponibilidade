@@ -157,11 +157,14 @@
                 <p>Visualizar relatórios e gráficos</p>
             </a>
 
+            <!-- Card Importar CSV - APENAS para admin e superv_operacao -->
+            {% if usuario.perfil == 'admin' or usuario.perfil == 'superv_operacao' %}
             <a href="/importar-csv" class="menu-card">
                 <div class="menu-icon">📤</div>
                 <h3>Importar CSV</h3>
                 <p>Importar eletricistas de arquivo</p>
             </a>
+            {% endif %}
             
             <!-- Card Gestão de Usuários (apenas para ADMIN) -->
             {% if usuario.perfil == 'admin' %}
@@ -189,5 +192,3 @@
 </body>
 
 </html>
-
-
