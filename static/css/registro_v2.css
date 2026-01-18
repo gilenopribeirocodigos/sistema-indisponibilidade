@@ -507,3 +507,91 @@ body {
     color: #7f8c8d;
     font-style: italic;
 }
+
+/* ==========================================
+   TIPO DE INDISPONIBILIDADE - RADIO BUTTONS
+========================================== */
+
+.tipo-indisponibilidade-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.radio-option {
+    border: 3px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: block;
+    position: relative;
+}
+
+.radio-option:hover {
+    border-color: #2E75B5;
+    background: #f8f9fa;
+}
+
+.radio-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+    color: #2E75B5;
+}
+
+.radio-option input[type="radio"]:checked ~ .radio-label {
+    color: #2E75B5;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+    border-color: #2E75B5;
+    background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
+    box-shadow: 0 4px 12px rgba(46, 117, 181, 0.2);
+}
+
+.radio-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 0;
+}
+
+.radio-icon {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.radio-label strong {
+    font-size: 18px;
+    color: #333;
+    display: block;
+}
+
+.radio-label small {
+    font-size: 13px;
+    color: #666;
+    font-weight: normal;
+    display: block;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .tipo-indisponibilidade-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .radio-option {
+        padding: 15px;
+    }
+    
+    .radio-icon {
+        font-size: 32px;
+    }
+}
+
