@@ -87,6 +87,7 @@ class EquipeDia(Base):
     prefixo = Column(String, nullable=False)
     data = Column(Date, nullable=False)
     supervisor_registro = Column(String, nullable=False)
+    usuario_registro = Column(Integer, ForeignKey("usuarios.id"))  # ← ADICIONAR
     criado_em = Column(DateTime, server_default=func.now())
     observacoes = Column(Text)
 
@@ -115,6 +116,7 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
 
 
 
