@@ -622,9 +622,17 @@ async def salvar_indisponibilidade(
         
         eletricista_id = form_data.get('eletricista_id')
         prefixo = form_data.get('prefixo')
+        tipo_indisponibilidade = form_data.get('tipo_indisponibilidade')  # ← ADICIONAR
         motivo_id = form_data.get('motivo_id')
         observacoes = form_data.get('observacoes', '')
         data_registro = form_data.get('data', None)
+        
+        # Validar tipo_indisponibilidade
+        if not tipo_indisponibilidade or tipo_indisponibilidade not in ['parcial', 'total']:
+            return JSONResponse({
+                "success": False, 
+                "erro": "⚠️ Selecione o tipo de indisponibilidade (Parcial ou Total)"
+            })
         
         # Definir data
         if data_registro:
@@ -643,7 +651,6 @@ async def salvar_indisponibilidade(
         if not eletricista:
             return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
 
-        # ✅ ADICIONAR ESTA VALIDAÇÃO AQUI:
         # Verificar se já foi registrado na FREQUÊNCIA hoje
         ja_na_frequencia = db.query(EquipeDia).filter(
             EquipeDia.eletricista_id == eletricista_id,
@@ -682,6 +689,7 @@ async def salvar_indisponibilidade(
             eletricista_id=eletricista_id,
             matricula=eletricista.matricula,
             prefixo=prefixo,
+            tipo_indisponibilidade=tipo_indisponibilidade,  # ← ADICIONAR
             motivo_id=motivo_id,
             observacao=observacoes if observacoes else None,
             usuario_registro=usuario.id
@@ -690,10 +698,13 @@ async def salvar_indisponibilidade(
         db.add(nova_indisponibilidade)
         db.commit()
         
+        # Mensagem com tipo
+        tipo_texto = "Parcial" if tipo_indisponibilidade == "parcial" else "Total"
+        
         return JSONResponse({
             "success": True,
             "data": data_obj.strftime('%d/%m/%Y'),
-            "mensagem": f"Indisponibilidade de {eletricista.colaborador} registrada para {data_obj.strftime('%d/%m/%Y')}!"
+            "mensagem": f"Indisponibilidade {tipo_texto} de {eletricista.colaborador} registrada para {data_obj.strftime('%d/%m/%Y')}!"
         })
         
     except Exception as e:
@@ -1464,6 +1475,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
