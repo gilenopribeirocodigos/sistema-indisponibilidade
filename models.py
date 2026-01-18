@@ -67,6 +67,7 @@ class Indisponibilidade(Base):
     eletricista2_id = Column(Integer, ForeignKey('estrutura_equipes.id'))  # ← NOVO!
     matricula = Column(String)
     prefixo = Column(String, nullable=False)
+    tipo_indisponibilidade = Column(String)  # ← NOVO! 'parcial' ou 'total'
     motivo_id = Column(Integer, ForeignKey('motivos_indisponibilidade.id'))
     observacao = Column(Text)
     usuario_registro = Column(Integer, ForeignKey('usuarios.id'))
@@ -114,5 +115,6 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
 
 
