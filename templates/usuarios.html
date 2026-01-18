@@ -43,7 +43,7 @@
             </div>
         </div>
 
-        <!-- Tabela de Usuários -->
+        <!-- Tabela de Usuários - DESKTOP -->
         <div class="usuarios-tabela-container">
             <table class="usuarios-tabela">
                 <thead>
@@ -111,6 +111,69 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Cards de Usuários - MOBILE -->
+        <div class="usuarios-cards">
+            {% for user in usuarios %}
+            <div class="usuario-card {% if not user.ativo %}usuario-inativo{% endif %}">
+                <div class="usuario-card-header">
+                    <div class="usuario-card-nome">
+                        <strong>{{ user.nome }}</strong>
+                        <small>{{ user.login }}</small>
+                    </div>
+                    {% if user.ativo %}
+                        <span class="badge badge-ativo">✅ Ativo</span>
+                    {% else %}
+                        <span class="badge badge-inativo">⭕ Inativo</span>
+                    {% endif %}
+                </div>
+                
+                <div class="usuario-card-info">
+                    <div class="info-item">
+                        <span class="info-label">Perfil</span>
+                        <span class="badge badge-{{ user.perfil.lower().replace('_', '-') }}">
+                            {% if user.perfil == 'admin' %}
+                                👑 ADMIN
+                            {% elif user.perfil == 'superv_campo' %}
+                                👨‍💼 Superv. Campo
+                            {% elif user.perfil == 'superv_operacao' %}
+                                👨‍💻 Superv. Operação
+                            {% elif user.perfil == 'visualizador' %}
+                                👀 Visualizador
+                            {% else %}
+                                {{ user.perfil }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Base/Região</span>
+                        <span class="info-value">{{ user.base_responsavel or '-' }}</span>
+                    </div>
+                </div>
+                
+                <div class="usuario-card-acoes">
+                    <a href="/usuarios/editar/{{ user.id }}" class="btn-acao btn-editar" title="Editar">
+                        ✏️
+                    </a>
+                    
+                    {% if user.ativo %}
+                        <button onclick="toggleStatus({{ user.id }}, false)" class="btn-acao btn-desativar" title="Desativar">
+                            🔴
+                        </button>
+                    {% else %}
+                        <button onclick="toggleStatus({{ user.id }}, true)" class="btn-acao btn-ativar" title="Ativar">
+                            🟢
+                        </button>
+                    {% endif %}
+                    
+                    <button onclick="resetarSenha({{ user.id }}, '{{ user.nome }}')" class="btn-acao btn-reset" title="Resetar Senha">
+                        🔑
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
         </div>
 
         <!-- Rodapé -->
