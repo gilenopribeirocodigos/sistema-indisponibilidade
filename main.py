@@ -466,7 +466,8 @@ async def salvar_frequencia(
                 eletricista_id=assoc['eletricista_id'],
                 prefixo=assoc['prefixo'],
                 data=data_obj,
-                supervisor_registro=usuario.base_responsavel or usuario.nome
+                supervisor_registro=usuario.base_responsavel or usuario.nome,
+                usuario_registro=usuario.id  # ← ADICIONAR ESTA LINHA
             )
             db.add(nova_equipe)
             total_salvo += 1
@@ -1475,6 +1476,7 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
