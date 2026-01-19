@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Sistema de Indisponibilidade</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/relatorios.css">
+</head>
+<body>
+    <div class="relatorio-container">
+        <!-- Header -->
+        <div class="relatorio-header">
+            <a href="/home" class="btn-voltar">← Voltar</a>
+            <h1>📊 Relatórios de Disponibilidade</h1>
+            <div class="user-info-mini">
+                <span>{{ usuario.nome }}</span>
+                <span class="badge badge-{{ usuario.perfil.lower().replace('_', '-') }}">{{ usuario.perfil }}</span>
+            </div>
+        </div>
+
+        <!-- Abas -->
+        <div class="tabs-container">
+            <button class="tab-btn active" data-tab="geral">📋 Relatório Geral</button>
+            <button class="tab-btn" data-tab="supervisor">👥 Por Supervisor</button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filtros-section">
+            <div class="filtro-grupo">
+                <label for="tipo-periodo">📅 Tipo de Período:</label>
+                <select id="tipo-periodo">
+                    <option value="dia">Dia Específico</option>
+                    <option value="periodo" selected>Período</option>
+                </select>
+            </div>
+
+            <div class="filtro-grupo" id="filtro-dia" style="display: none;">
+                <label for="data-dia">Data:</label>
+                <input type="date" id="data-dia" value="{{ hoje_iso }}">
+            </div>
+
+            <div class="filtro-grupo" id="filtro-periodo">
+                <label for="data-inicio">De:</label>
+                <input type="date" id="data-inicio" value="{{ inicio_mes }}">
+                <label for="data-fim">Até:</label>
+                <input type="date" id="data-fim" value="{{ hoje_iso }}">
+            </div>
+
+            <button id="btn-gerar-relatorio" class="btn btn-primary">📊 Gerar Relatório</button>
+            <button id="btn-exportar" class="btn btn-success" style="display: none;">📥 Exportar Excel</button>
+        </div>
+
+        <!-- ============================================
+             TAB 1: RELATÓRIO GERAL
+        ============================================ -->
+        <div id="tab-geral" class="tab-content active">
+            <!-- Info do Relatório -->
+            <div id="relatorio-geral-info" class="relatorio-info" style="display: none;">
+                <h2>RELATÓRIO DE DISPONIBILIDADE - GERAL</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Período:</strong> <span id="geral-periodo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Eletricistas:</strong> <span id="geral-total-eletricistas">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Registros:</strong> <span id="geral-total-registros">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="relatorio-tabela-container" id="container-tabela-geral" style="display: none;">
+                <table class="relatorio-tabela" id="tabela-geral">
+                    <thead>
+                        <tr>
+                            <th>Motivo</th>
+                            <th>Qtde</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="3" class="loading">Gere um relatório para visualizar os dados</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total</strong></td>
+                            <td id="geral-total-qtde"><strong>-</strong></td>
+                            <td><strong>100,0%</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============================================
+             TAB 2: RELATÓRIO POR SUPERVISOR
+        ============================================ -->
+        <div id="tab-supervisor" class="tab-content">
+            <!-- Info do Relatório -->
+            <div id="relatorio-sup-info" class="relatorio-info" style="display: none;">
+                <h2>RELATÓRIO DE DISPONIBILIDADE - POR SUPERVISOR</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Período:</strong> <span id="sup-periodo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Registros:</strong> <span id="sup-total-registros">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="relatorio-tabela-container" id="container-tabela-sup" style="display: none;">
+                <table class="relatorio-tabela tabela-wide" id="tabela-supervisor">
+                    <thead>
+                        <tr id="cabecalho-supervisor">
+                            <th>Supervisor</th>
+                            <th>Total Elet.</th>
+                            <th>Presente</th>
+                            <!-- Colunas dinâmicas de motivos -->
+                            <th>Total Reg.</th>
+                            <th>% Presença</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" class="loading">Gere um relatório para visualizar os dados</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-relatorio">
+            <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
+            <p>Gerado em: <span id="data-geracao">-</span></p>
+        </div>
+    </div>
+
+    <script src="/static/js/relatorios.js"></script>
+</body>
+</html>
