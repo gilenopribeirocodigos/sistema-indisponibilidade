@@ -157,6 +157,12 @@
                 <p>Visualizar relatórios e gráficos</p>
             </a>
 
+            <a href="/relatorios" class="menu-card">
+                <div class="menu-icon">📋</div>
+                <h3>Relatórios</h3>
+                <p>Relatórios de disponibilidade</p>
+            </a>
+
             <!-- Card Importar CSV - APENAS para admin e superv_operacao -->
             {% if usuario.perfil == 'admin' or usuario.perfil == 'superv_operacao' %}
             <a href="/importar-csv" class="menu-card">
@@ -180,7 +186,6 @@
                 <h3>Histórico</h3>
                 <p>Ver histórico de indisponibilidades</p>
             </a>
-            
         </div>
 
         <!-- Rodapé -->
@@ -190,5 +195,4 @@
         </div>
     </div>
 </body>
-
 </html>
