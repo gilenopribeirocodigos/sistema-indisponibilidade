@@ -202,39 +202,45 @@ document.addEventListener('DOMContentLoaded', () => {
             const thead = document.getElementById('cabecalho-supervisor');
             thead.innerHTML = '';
             
-            // Colunas fixas
+            // Colunas fixas (SEM "Total Elet.")
             thead.innerHTML = `
                 <th>Supervisor</th>
-                <th>Total Elet.</th>
                 <th>Presentes</th>
             `;
             
-            // Colunas dinâmicas de motivos
+            // Colunas dinâmicas de motivos (quantidades)
             motivos.forEach(motivo => {
                 const th = document.createElement('th');
                 th.textContent = motivo;
                 thead.appendChild(th);
             });
             
-            // Colunas finais
+            // Coluna Total
             const thTotal = document.createElement('th');
             thTotal.textContent = 'Total';
             thead.appendChild(thTotal);
             
+            // Coluna % Presença
             const thPercPresenca = document.createElement('th');
-            thPercPresenca.textContent = '% Presença';
+            thPercPresenca.textContent = '% Presente';
             thead.appendChild(thPercPresenca);
             
-            // Adicionar colunas de percentuais dos motivos
+            // Colunas de percentuais dos motivos
             motivos.forEach(motivo => {
                 const th = document.createElement('th');
-                th.textContent = `% ${motivo}`;
+                th.textContent = motivo; // só o nome do motivo (sem %)
                 thead.appendChild(th);
             });
             
             // Renderizar dados
             const tbody = document.querySelector('#tabela-supervisor tbody');
             tbody.innerHTML = '';
+            
+            // ✅ CALCULAR TOTAIS GERAIS
+            let totalPresentes = 0;
+            let totalRegistros = 0;
+            const totaisMotivos = {};
+            motivos.forEach(m => totaisMotivos[m] = 0);
             
             data.dados.forEach(sup => {
                 const tr = document.createElement('tr');
@@ -248,27 +254,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdSup.innerHTML = `<strong>${sup.supervisor || 'N/A'}</strong>`;
                 tr.appendChild(tdSup);
                 
-                // Total eletricistas
-                const tdTotal = document.createElement('td');
-                tdTotal.textContent = sup.total_eletricistas || 0;
-                tr.appendChild(tdTotal);
-                
                 // Presentes
                 const tdPresentes = document.createElement('td');
-                tdPresentes.textContent = contadores.Presente || 0;
+                const qtdPresentes = contadores.Presente || 0;
+                tdPresentes.textContent = qtdPresentes;
                 tr.appendChild(tdPresentes);
+                
+                // ✅ SOMAR para total
+                totalPresentes += qtdPresentes;
                 
                 // Contadores de motivos
                 motivos.forEach(motivo => {
                     const td = document.createElement('td');
-                    td.textContent = contadores[motivo] || 0;
+                    const qtd = contadores[motivo] || 0;
+                    td.textContent = qtd;
                     tr.appendChild(td);
+                    
+                    // ✅ SOMAR para total
+                    totaisMotivos[motivo] += qtd;
                 });
                 
                 // Total registros
                 const tdTotalReg = document.createElement('td');
-                tdTotalReg.innerHTML = `<strong>${sup.total_registros || 0}</strong>`;
+                const totalReg = sup.total_registros || 0;
+                tdTotalReg.innerHTML = `<strong>${totalReg}</strong>`;
                 tr.appendChild(tdTotalReg);
+                
+                // ✅ SOMAR para total
+                totalRegistros += totalReg;
                 
                 // % Presença
                 const tdPercPresenca = document.createElement('td');
@@ -297,6 +310,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.appendChild(tr);
             });
             
+            // ✅ ADICIONAR LINHA DE TOTAL
+            const trTotal = document.createElement('tr');
+            trTotal.style.backgroundColor = '#d4edda';
+            trTotal.style.fontWeight = 'bold';
+            
+            // Supervisor = TOTAL
+            const tdTotalLabel = document.createElement('td');
+            tdTotalLabel.innerHTML = '<strong>TOTAL</strong>';
+            trTotal.appendChild(tdTotalLabel);
+            
+            // Total Presentes
+            const tdTotalPresentes = document.createElement('td');
+            tdTotalPresentes.textContent = totalPresentes;
+            trTotal.appendChild(tdTotalPresentes);
+            
+            // Totais dos motivos
+            motivos.forEach(motivo => {
+                const td = document.createElement('td');
+                td.textContent = totaisMotivos[motivo];
+                trTotal.appendChild(td);
+            });
+            
+            // Total de registros
+            const tdTotalGeral = document.createElement('td');
+            tdTotalGeral.innerHTML = `<strong>${totalRegistros}</strong>`;
+            trTotal.appendChild(tdTotalGeral);
+            
+            // % Presença total
+            const percPresencaTotal = totalRegistros > 0 ? ((totalPresentes / totalRegistros) * 100).toFixed(1) : 0;
+            const tdPercTotal = document.createElement('td');
+            tdPercTotal.innerHTML = `<strong>${percPresencaTotal}%</strong>`;
+            
+            if (percPresencaTotal >= 95) {
+                tdPercTotal.classList.add('percentual-alta');
+            } else if (percPresencaTotal >= 85) {
+                tdPercTotal.classList.add('percentual-media');
+            } else {
+                tdPercTotal.classList.add('percentual-baixa');
+            }
+            
+            trTotal.appendChild(tdPercTotal);
+            
+            // Percentuais totais dos motivos
+            motivos.forEach(motivo => {
+                const td = document.createElement('td');
+                const percMotivo = totalRegistros > 0 ? ((totaisMotivos[motivo] / totalRegistros) * 100).toFixed(1) : 0;
+                td.textContent = `${percMotivo}%`;
+                trTotal.appendChild(td);
+            });
+            
+            tbody.appendChild(trTotal);
+            
             // Mostrar tabela
             document.getElementById('container-tabela-sup').style.display = 'block';
             
@@ -310,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro completo:', error);
         }
     }
+
 
     
 });
