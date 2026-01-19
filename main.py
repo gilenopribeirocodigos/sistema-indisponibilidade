@@ -1499,12 +1499,331 @@ async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db))
         return JSONResponse({"success": False, "erro": str(e)})
 
 # ========================================
+# ROTAS DE RELATÓRIOS
+# ========================================
+
+@app.get("/relatorios", response_class=HTMLResponse)
+def relatorios_page(request: Request, db: Session = Depends(get_db)):
+    """Página de relatórios"""
+    
+    # Verificar se está logado
+    if not verificar_autenticacao(request):
+        return RedirectResponse(url="/login")
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        request.session.clear()
+        return RedirectResponse(url="/login")
+    
+    from models import EstruturaEquipes
+    from datetime import datetime, timedelta
+    
+    # Buscar supervisores únicos
+    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
+    supervisores = [s[0] for s in supervisores if s[0]]
+    
+    # Datas padrão
+    hoje = date.today()
+    inicio_mes = date(hoje.year, hoje.month, 1)
+    
+    return templates.TemplateResponse(
+        "relatorios.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "supervisores": supervisores,
+            "hoje_iso": hoje.isoformat(),
+            "inicio_mes": inicio_mes.isoformat()
+        }
+    )
+
+
+@app.get("/api/relatorio-geral")
+def relatorio_geral(
+    request: Request,
+    data_inicio: str = None,
+    data_fim: str = None,
+    db: Session = Depends(get_db)
+):
+    """API para gerar relatório GERAL (consolidado de todos)"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    
+    try:
+        # Definir período
+        if data_inicio and data_fim:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        elif data_inicio:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = data_inicio_obj
+        else:
+            data_inicio_obj = date.today()
+            data_fim_obj = date.today()
+        
+        # Buscar total de eletricistas ATIVOS/RESERVA
+        total_eletricistas = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+        ).count()
+        
+        # Criar lista de datas no período
+        dias_periodo = []
+        data_atual = data_inicio_obj
+        while data_atual <= data_fim_obj:
+            dias_periodo.append(data_atual)
+            data_atual += timedelta(days=1)
+        
+        # Dicionário para contar
+        resultado = {
+            "Presente": 0,
+            "Não registrado": 0
+        }
+        
+        # Para cada dia no período
+        for dia in dias_periodo:
+            # 1. PRESENTES (frequência)
+            ids_presentes = db.query(EquipeDia.eletricista_id).filter(
+                EquipeDia.data == dia
+            ).all()
+            ids_presentes = set([p[0] for p in ids_presentes])
+            
+            resultado["Presente"] += len(ids_presentes)
+            
+            # 2. INDISPONÍVEIS com motivo
+            indisponiveis = db.query(
+                Indisponibilidade.eletricista_id,
+                MotivoIndisponibilidade.descricao
+            ).join(
+                MotivoIndisponibilidade,
+                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+            ).filter(
+                Indisponibilidade.data == dia
+            ).all()
+            
+            ids_indisponiveis = set([i[0] for i in indisponiveis])
+            
+            # Contar por motivo
+            for elet_id, motivo in indisponiveis:
+                if motivo not in resultado:
+                    resultado[motivo] = 0
+                resultado[motivo] += 1
+            
+            # 3. NÃO REGISTRADOS
+            ids_registrados = ids_presentes.union(ids_indisponiveis)
+            
+            total_nao_registrados = db.query(EstruturaEquipes.id).filter(
+                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA']),
+                ~EstruturaEquipes.id.in_(list(ids_registrados))
+            ).count()
+            
+            resultado["Não registrado"] += total_nao_registrados
+        
+        # Calcular total de registros
+        total_registros = sum(resultado.values())
+        
+        # Calcular percentuais
+        dados_relatorio = []
+        for motivo, qtde in resultado.items():
+            percentual = (qtde / total_registros * 100) if total_registros > 0 else 0
+            dados_relatorio.append({
+                "motivo": motivo,
+                "qtde": qtde,
+                "percentual": round(percentual, 1)
+            })
+        
+        # Ordenar: Presente primeiro, depois alfabético
+        dados_relatorio.sort(key=lambda x: (
+            0 if x['motivo'] == 'Presente' else 
+            2 if x['motivo'] == 'Não registrado' else 
+            1,
+            x['motivo']
+        ))
+        
+        return JSONResponse({
+            "success": True,
+            "periodo": {
+                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
+                "fim": data_fim_obj.strftime('%d/%m/%Y'),
+                "dias": len(dias_periodo)
+            },
+            "total_eletricistas": total_eletricistas,
+            "total_registros": total_registros,
+            "dados": dados_relatorio
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
+
+@app.get("/api/relatorio-por-supervisor")
+def relatorio_por_supervisor(
+    request: Request,
+    data_inicio: str = None,
+    data_fim: str = None,
+    db: Session = Depends(get_db)
+):
+    """API para gerar relatório POR SUPERVISOR"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
+    from datetime import datetime, timedelta
+    
+    try:
+        # Definir período
+        if data_inicio and data_fim:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        elif data_inicio:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = data_inicio_obj
+        else:
+            data_inicio_obj = date.today()
+            data_fim_obj = date.today()
+        
+        # Criar lista de datas no período
+        dias_periodo = []
+        data_atual = data_inicio_obj
+        while data_atual <= data_fim_obj:
+            dias_periodo.append(data_atual)
+            data_atual += timedelta(days=1)
+        
+        # Buscar todos os supervisores
+        supervisores = db.query(EstruturaEquipes.superv_campo).filter(
+            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+        ).distinct().all()
+        supervisores = [s[0] for s in supervisores if s[0]]
+        
+        # Buscar todos os motivos possíveis
+        motivos_db = db.query(MotivoIndisponibilidade.descricao).all()
+        todos_motivos = set([m[0] for m in motivos_db])
+        
+        dados_supervisores = []
+        
+        # Para cada supervisor
+        for supervisor in supervisores:
+            # Total de eletricistas desse supervisor
+            total_eletricistas_sup = db.query(EstruturaEquipes).filter(
+                EstruturaEquipes.superv_campo == supervisor,
+                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+            ).count()
+            
+            # Contadores por motivo
+            contadores = {
+                "Presente": 0,
+                "Não registrado": 0
+            }
+            
+            # Para cada dia
+            for dia in dias_periodo:
+                # 1. PRESENTES
+                presentes = db.query(EquipeDia.eletricista_id).join(
+                    EstruturaEquipes,
+                    EquipeDia.eletricista_id == EstruturaEquipes.id
+                ).filter(
+                    EquipeDia.data == dia,
+                    EstruturaEquipes.superv_campo == supervisor
+                ).all()
+                
+                ids_presentes = set([p[0] for p in presentes])
+                contadores["Presente"] += len(ids_presentes)
+                
+                # 2. INDISPONÍVEIS
+                indisponiveis = db.query(
+                    Indisponibilidade.eletricista_id,
+                    MotivoIndisponibilidade.descricao
+                ).join(
+                    MotivoIndisponibilidade,
+                    Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+                ).join(
+                    EstruturaEquipes,
+                    Indisponibilidade.eletricista_id == EstruturaEquipes.id
+                ).filter(
+                    Indisponibilidade.data == dia,
+                    EstruturaEquipes.superv_campo == supervisor
+                ).all()
+                
+                ids_indisponiveis = set([i[0] for i in indisponiveis])
+                
+                for elet_id, motivo in indisponiveis:
+                    if motivo not in contadores:
+                        contadores[motivo] = 0
+                    contadores[motivo] += 1
+                
+                # 3. NÃO REGISTRADOS
+                ids_registrados = ids_presentes.union(ids_indisponiveis)
+                
+                nao_registrados = db.query(EstruturaEquipes.id).filter(
+                    EstruturaEquipes.superv_campo == supervisor,
+                    EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA']),
+                    ~EstruturaEquipes.id.in_(list(ids_registrados)) if ids_registrados else True
+                ).count()
+                
+                contadores["Não registrado"] += nao_registrados
+            
+            # Calcular totais
+            total_registros = sum(contadores.values())
+            percentual_presenca = (contadores["Presente"] / total_registros * 100) if total_registros > 0 else 0
+            
+            dados_supervisores.append({
+                "supervisor": supervisor,
+                "total_eletricistas": total_eletricistas_sup,
+                "contadores": contadores,
+                "total_registros": total_registros,
+                "percentual_presenca": round(percentual_presenca, 1)
+            })
+        
+        # Ordenar por % de presença (decrescente)
+        dados_supervisores.sort(key=lambda x: x['percentual_presenca'], reverse=True)
+        
+        # Calcular totais gerais
+        total_geral = sum([s['total_registros'] for s in dados_supervisores])
+        
+        return JSONResponse({
+            "success": True,
+            "periodo": {
+                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
+                "fim": data_fim_obj.strftime('%d/%m/%Y'),
+                "dias": len(dias_periodo)
+            },
+            "todos_motivos": sorted(list(todos_motivos)),
+            "dados": dados_supervisores,
+            "total_geral": total_geral
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
+# ========================================
 # EXECUTAR SERVIDOR
 # ========================================
 
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
