@@ -155,13 +155,7 @@
                 <div class="menu-icon">📊</div>
                 <h3>Dashboard</h3>
                 <p>Visualizar relatórios e gráficos</p>
-            </a>
-
-            <a href="/relatorios" class="menu-card">
-                <div class="menu-icon">📋</div>
-                <h3>Relatórios</h3>
-                <p>Relatórios de disponibilidade</p>
-            </a>
+            </a>            
 
             <!-- Card Importar CSV - APENAS para admin e superv_operacao -->
             {% if usuario.perfil == 'admin' or usuario.perfil == 'superv_operacao' %}
@@ -196,3 +190,4 @@
     </div>
 </body>
 </html>
+
