@@ -48,7 +48,6 @@
             </div>
 
             <button id="btn-gerar-relatorio" class="btn btn-primary">📊 Gerar Relatório</button>
-            <button id="btn-exportar" class="btn btn-success" style="display: none;">📥 Exportar Excel</button>
         </div>
 
         <!-- ============================================
@@ -116,23 +115,25 @@
 
             <!-- Tabela -->
             <div class="relatorio-tabela-container" id="container-tabela-sup" style="display: none;">
-                <table class="relatorio-tabela tabela-wide" id="tabela-supervisor">
-                    <thead>
-                        <tr id="cabecalho-supervisor">
-                            <th>Supervisor</th>
-                            <th>Total Elet.</th>
-                            <th>Presente</th>
-                            <!-- Colunas dinâmicas de motivos -->
-                            <th>Total Reg.</th>
-                            <th>% Presença</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="5" class="loading">Gere um relatório para visualizar os dados</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table class="relatorio-tabela tabela-wide" id="tabela-supervisor">
+                        <thead>
+                            <tr id="cabecalho-supervisor">
+                                <th>Supervisor</th>
+                                <th>Total Elet.</th>
+                                <th>Presentes</th>
+                                <!-- Colunas dinâmicas de motivos serão inseridas aqui -->
+                                <th>Total</th>
+                                <th>% Presença</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="loading">Gere um relatório para visualizar os dados</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
