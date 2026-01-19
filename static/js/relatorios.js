@@ -183,6 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            // ✅ GARANTIR que motivos é um array
+            const motivos = data.motivos || [];
+            
             // Atualizar informações
             document.getElementById('relatorio-sup-info').style.display = 'block';
             document.getElementById('sup-periodo').textContent = 
@@ -201,20 +204,23 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             // Colunas dinâmicas de motivos
-            data.motivos.forEach(motivo => {
+            motivos.forEach(motivo => {
                 const th = document.createElement('th');
                 th.textContent = motivo;
                 thead.appendChild(th);
             });
             
             // Colunas finais
-            thead.innerHTML += `
-                <th>Total</th>
-                <th>% Presença</th>
-            `;
+            const thTotal = document.createElement('th');
+            thTotal.textContent = 'Total';
+            thead.appendChild(thTotal);
+            
+            const thPercPresenca = document.createElement('th');
+            thPercPresenca.textContent = '% Presença';
+            thead.appendChild(thPercPresenca);
             
             // Adicionar colunas de percentuais dos motivos
-            data.motivos.forEach(motivo => {
+            motivos.forEach(motivo => {
                 const th = document.createElement('th');
                 th.textContent = `% ${motivo}`;
                 thead.appendChild(th);
@@ -223,6 +229,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Renderizar dados
             const tbody = document.querySelector('#tabela-supervisor tbody');
             tbody.innerHTML = '';
+            
+            // ✅ VERIFICAR se há dados
+            if (!data.dados || data.dados.length === 0) {
+                const numColunas = 5 + (motivos.length * 2);
+                tbody.innerHTML = `<tr><td colspan="${numColunas}" class="loading">Nenhum dado encontrado no período selecionado</td></tr>`;
+                document.getElementById('container-tabela-sup').style.display = 'block';
+                return;
+            }
             
             data.dados.forEach(sup => {
                 const tr = document.createElement('tr');
@@ -243,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.appendChild(tdPresentes);
                 
                 // Contadores de motivos
-                data.motivos.forEach(motivo => {
+                motivos.forEach(motivo => {
                     const td = document.createElement('td');
                     td.textContent = sup.contadores[motivo] || 0;
                     tr.appendChild(td);
@@ -271,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.appendChild(tdPercPresenca);
                 
                 // Percentuais dos motivos
-                data.motivos.forEach(motivo => {
+                motivos.forEach(motivo => {
                     const td = document.createElement('td');
                     const perc = sup.percentuais[motivo] || 0;
                     td.textContent = `${perc}%`;
@@ -294,4 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(error);
         }
     }
+
+    
 });
