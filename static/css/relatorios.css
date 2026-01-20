@@ -214,6 +214,16 @@
     white-space: nowrap;
 }
 
+/* Colunas de percentual com fundo amarelo */
+.relatorio-tabela th.col-percentual {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+    color: #333;
+}
+
+.relatorio-tabela td.col-percentual {
+    background-color: #fffbf0;
+}
+
 .relatorio-tabela tbody tr {
     border-bottom: 1px solid #f0f0f0;
     transition: all 0.3s;
@@ -221,6 +231,10 @@
 
 .relatorio-tabela tbody tr:hover {
     background: #f8f9ff;
+}
+
+.relatorio-tabela tbody tr:hover td.col-percentual {
+    background-color: #fff9e6;
 }
 
 .relatorio-tabela td {
@@ -247,6 +261,20 @@
 
 .total-row {
     background: #f8f9fa;
+}
+
+/* Linha de TOTAL */
+.linha-total {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    font-weight: bold;
+}
+
+.linha-total td {
+    border-top: 3px solid #28a745;
+}
+
+.linha-total td.col-percentual {
+    background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
 }
 
 /* Tabela Wide (com mais colunas) */
