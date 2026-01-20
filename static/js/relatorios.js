@@ -198,17 +198,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             document.getElementById('sup-total-registros').textContent = data.total_geral || 0;
             
-            // Montar cabeçalho dinâmico
+            // ========================================
+            // MONTAR CABEÇALHO DINÂMICO
+            // ========================================
             const thead = document.getElementById('cabecalho-supervisor');
             thead.innerHTML = '';
             
-            // Colunas fixas (SEM "Total Elet.")
-            thead.innerHTML = `
-                <th>Supervisor</th>
-                <th>Presentes</th>
-            `;
+            // PARTE 1: COLUNAS DE QUANTIDADE
+            // Coluna Supervisor
+            const thSupervisor = document.createElement('th');
+            thSupervisor.textContent = 'Supervisor';
+            thead.appendChild(thSupervisor);
             
-            // Colunas dinâmicas de motivos (quantidades)
+            // Coluna Presentes
+            const thPresentes = document.createElement('th');
+            thPresentes.textContent = 'Presentes';
+            thead.appendChild(thPresentes);
+            
+            // Colunas de motivos (quantidades)
             motivos.forEach(motivo => {
                 const th = document.createElement('th');
                 th.textContent = motivo;
@@ -220,19 +227,24 @@ document.addEventListener('DOMContentLoaded', () => {
             thTotal.textContent = 'Total';
             thead.appendChild(thTotal);
             
-            // Coluna % Presença
-            const thPercPresenca = document.createElement('th');
-            thPercPresenca.textContent = '% Presente';
-            thead.appendChild(thPercPresenca);
+            // PARTE 2: COLUNAS DE PERCENTUAL (com fundo amarelo)
+            // Coluna % Presente
+            const thPercPresente = document.createElement('th');
+            thPercPresente.textContent = '% Presente';
+            thPercPresente.classList.add('col-percentual');
+            thead.appendChild(thPercPresente);
             
-            // Colunas de percentuais dos motivos
+            // Colunas de % dos motivos
             motivos.forEach(motivo => {
                 const th = document.createElement('th');
-                th.textContent = motivo; // só o nome do motivo (sem %)
+                th.textContent = motivo;
+                th.classList.add('col-percentual');
                 thead.appendChild(th);
             });
             
-            // Renderizar dados
+            // ========================================
+            // RENDERIZAR DADOS
+            // ========================================
             const tbody = document.querySelector('#tabela-supervisor tbody');
             tbody.innerHTML = '';
             
@@ -287,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tdPercPresenca = document.createElement('td');
                 const percPresenca = percentuais.Presente || 0;
                 tdPercPresenca.innerHTML = `<strong>${percPresenca}%</strong>`;
+                tdPercPresenca.classList.add('col-percentual');
                 
                 // Cor baseada no percentual
                 if (percPresenca >= 95) {
@@ -304,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const td = document.createElement('td');
                     const perc = percentuais[motivo] || 0;
                     td.textContent = `${perc}%`;
+                    td.classList.add('col-percentual');
                     tr.appendChild(td);
                 });
                 
@@ -312,8 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // ✅ ADICIONAR LINHA DE TOTAL
             const trTotal = document.createElement('tr');
-            trTotal.style.backgroundColor = '#d4edda';
-            trTotal.style.fontWeight = 'bold';
+            trTotal.classList.add('linha-total');
             
             // Supervisor = TOTAL
             const tdTotalLabel = document.createElement('td');
@@ -322,13 +335,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Total Presentes
             const tdTotalPresentes = document.createElement('td');
-            tdTotalPresentes.textContent = totalPresentes;
+            tdTotalPresentes.innerHTML = `<strong>${totalPresentes}</strong>`;
             trTotal.appendChild(tdTotalPresentes);
             
             // Totais dos motivos
             motivos.forEach(motivo => {
                 const td = document.createElement('td');
-                td.textContent = totaisMotivos[motivo];
+                td.innerHTML = `<strong>${totaisMotivos[motivo]}</strong>`;
                 trTotal.appendChild(td);
             });
             
@@ -341,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const percPresencaTotal = totalRegistros > 0 ? ((totalPresentes / totalRegistros) * 100).toFixed(1) : 0;
             const tdPercTotal = document.createElement('td');
             tdPercTotal.innerHTML = `<strong>${percPresencaTotal}%</strong>`;
+            tdPercTotal.classList.add('col-percentual');
             
             if (percPresencaTotal >= 95) {
                 tdPercTotal.classList.add('percentual-alta');
@@ -356,7 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
             motivos.forEach(motivo => {
                 const td = document.createElement('td');
                 const percMotivo = totalRegistros > 0 ? ((totaisMotivos[motivo] / totalRegistros) * 100).toFixed(1) : 0;
-                td.textContent = `${percMotivo}%`;
+                td.innerHTML = `<strong>${percMotivo}%</strong>`;
+                td.classList.add('col-percentual');
                 trTotal.appendChild(td);
             });
             
@@ -375,7 +390,4 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro completo:', error);
         }
     }
-
-
-    
 });
