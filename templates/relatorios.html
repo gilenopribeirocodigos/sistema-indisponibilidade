@@ -9,7 +9,7 @@
 </head>
 <body>
     <div class="relatorio-container">
-
+        <!-- Header -->
         <div class="relatorio-header">
             <a href="/home" class="btn-voltar">← Voltar</a>
             <h1>📊 Relatórios de Disponibilidade</h1>
@@ -19,11 +19,13 @@
             </div>
         </div>
 
+        <!-- Abas -->
         <div class="tabs-container">
             <button class="tab-btn active" data-tab="geral">📋 Relatório Geral</button>
             <button class="tab-btn" data-tab="supervisor">👥 Por Supervisor</button>
         </div>
 
+        <!-- Filtros -->
         <div class="filtros-section">
             <div class="filtro-grupo">
                 <label for="tipo-periodo">📅 Tipo de Período:</label>
@@ -48,9 +50,57 @@
             <button id="btn-gerar-relatorio" class="btn btn-primary">📊 Gerar Relatório</button>
         </div>
 
-        <!-- TAB SUPERVISOR -->
-        <div id="tab-supervisor" class="tab-content active">
+        <!-- ============================================
+             TAB 1: RELATÓRIO GERAL
+        ============================================ -->
+        <div id="tab-geral" class="tab-content active">
+            <!-- Info do Relatório -->
+            <div id="relatorio-geral-info" class="relatorio-info" style="display: none;">
+                <h2>RELATÓRIO DE DISPONIBILIDADE - GERAL</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Período:</strong> <span id="geral-periodo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Eletricistas:</strong> <span id="geral-total-eletricistas">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Registros:</strong> <span id="geral-total-registros">-</span>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Tabela -->
+            <div class="relatorio-tabela-container" id="container-tabela-geral" style="display: none;">
+                <table class="relatorio-tabela" id="tabela-geral">
+                    <thead>
+                        <tr>
+                            <th>Motivo</th>
+                            <th>Qtde</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="3" class="loading">Gere um relatório para visualizar os dados</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total</strong></td>
+                            <td id="geral-total-qtde"><strong>-</strong></td>
+                            <td><strong>100,0%</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============================================
+             TAB 2: RELATÓRIO POR SUPERVISOR
+        ============================================ -->
+        <div id="tab-supervisor" class="tab-content">
+            <!-- Info do Relatório -->
             <div id="relatorio-sup-info" class="relatorio-info" style="display: none;">
                 <h2>RELATÓRIO DE DISPONIBILIDADE - POR SUPERVISOR</h2>
                 <div class="info-grid">
@@ -63,32 +113,35 @@
                 </div>
             </div>
 
+            <!-- Tabela -->
             <div class="relatorio-tabela-container" id="container-tabela-sup" style="display: none;">
                 <div style="overflow-x: auto;">
                     <table class="relatorio-tabela tabela-wide" id="tabela-supervisor">
                         <thead>
                             <tr id="cabecalho-supervisor">
                                 <th>Supervisor</th>
-                                <th>PRESENTE</th>
-                                <th>TOTAL</th>
+                                <th>Total Elet.</th>
+                                <th>Presentes</th>
+                                <!-- Colunas dinâmicas de motivos serão inseridas aqui -->
+                                <th>Total</th>
+                                <th>% Presença</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td colspan="3" class="loading">Gere um relatório para visualizar os dados</td>
+                                <td colspan="5" class="loading">Gere um relatório para visualizar os dados</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div>
 
+        <!-- Footer -->
         <div class="footer-relatorio">
             <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
             <p>Gerado em: <span id="data-geracao">-</span></p>
         </div>
-
     </div>
 
     <script src="/static/js/relatorios.js"></script>
