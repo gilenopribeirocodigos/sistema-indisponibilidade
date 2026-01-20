@@ -390,4 +390,4 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro completo:', error);
         }
     }
-});
+}) ;
