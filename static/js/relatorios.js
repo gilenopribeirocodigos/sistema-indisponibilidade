@@ -2,6 +2,23 @@
 // RELATÓRIOS - JAVASCRIPT
 // ==========================================
 
+// ===== CONTROLE DAS ABAS (GERAL / SUPERVISOR) =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+
+        // Remove active de todos
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+        // Ativa o clicado
+        btn.classList.add('active');
+
+        const aba = btn.dataset.tab;
+        document.getElementById(`tab-${aba}`).classList.add('active');
+    });
+});
+
+
 document.addEventListener('DOMContentLoaded', () => {
 
     const btnGerar = document.getElementById('btn-gerar-relatorio');
