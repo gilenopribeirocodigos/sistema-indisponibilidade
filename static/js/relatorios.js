@@ -183,10 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // ✅ GARANTIR que motivos é um array
-            const motivos = data.motivos || [];
-            
-            // ✅ VERIFICAR se há dados
+            // Verificar se há dados
             if (!data.dados || data.dados.length === 0) {
                 alert('⚠️ Nenhum dado encontrado no período selecionado');
                 return;
@@ -198,49 +195,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             document.getElementById('sup-total-registros').textContent = data.total_geral || 0;
             
-            // ========================================
-            // MONTAR CABEÇALHO DINÂMICO
-            // ========================================
-            const thead = document.getElementById('cabecalho-supervisor');
-            thead.innerHTML = '';
-            
-            // PARTE 1: COLUNAS DE QUANTIDADE
-            // Coluna Supervisor
-            const thSupervisor = document.createElement('th');
-            thSupervisor.textContent = 'Supervisor';
-            thead.appendChild(thSupervisor);
-            
-            // Coluna Presentes
-            const thPresentes = document.createElement('th');
-            thPresentes.textContent = 'Presentes';
-            thead.appendChild(thPresentes);
-            
-            // Colunas de motivos (quantidades)
-            motivos.forEach(motivo => {
-                const th = document.createElement('th');
-                th.textContent = motivo;
-                thead.appendChild(th);
-            });
-            
-            // Coluna Total
-            const thTotal = document.createElement('th');
-            thTotal.textContent = 'Total';
-            thead.appendChild(thTotal);
-            
-            // PARTE 2: COLUNAS DE PERCENTUAL (com fundo amarelo)
-            // Coluna % Presente
-            const thPercPresente = document.createElement('th');
-            thPercPresente.textContent = '% Presente';
-            thPercPresente.classList.add('col-percentual');
-            thead.appendChild(thPercPresente);
-            
-            // Colunas de % dos motivos
-            motivos.forEach(motivo => {
-                const th = document.createElement('th');
-                th.textContent = motivo;
-                th.classList.add('col-percentual');
-                thead.appendChild(th);
-            });
+            // Lista de motivos na ordem correta
+            const motivos = [
+                'Atestado Médico',
+                'Falta Injustificada',
+                'Viatura com Defeito',
+                'Viatura em Manutenção',
+                'Acidente',
+                'Treinamento',
+                'Férias',
+                'Licença',
+                'Outro'
+            ];
             
             // ========================================
             // RENDERIZAR DADOS
@@ -248,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tbody = document.querySelector('#tabela-supervisor tbody');
             tbody.innerHTML = '';
             
-            // ✅ CALCULAR TOTAIS GERAIS
+            // Calcular totais gerais
             let totalPresentes = 0;
             let totalRegistros = 0;
             const totaisMotivos = {};
@@ -257,9 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data.dados.forEach(sup => {
                 const tr = document.createElement('tr');
                 
-                // ✅ GARANTIR que os objetos existem
                 const contadores = sup.contadores || {};
-                const percentuais = sup.percentuais || {};
                 
                 // Supervisor
                 const tdSup = document.createElement('td');
@@ -271,8 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const qtdPresentes = contadores.Presente || 0;
                 tdPresentes.textContent = qtdPresentes;
                 tr.appendChild(tdPresentes);
-                
-                // ✅ SOMAR para total
                 totalPresentes += qtdPresentes;
                 
                 // Contadores de motivos
@@ -281,8 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const qtd = contadores[motivo] || 0;
                     td.textContent = qtd;
                     tr.appendChild(td);
-                    
-                    // ✅ SOMAR para total
                     totaisMotivos[motivo] += qtd;
                 });
                 
@@ -291,40 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const totalReg = sup.total_registros || 0;
                 tdTotalReg.innerHTML = `<strong>${totalReg}</strong>`;
                 tr.appendChild(tdTotalReg);
-                
-                // ✅ SOMAR para total
                 totalRegistros += totalReg;
-                
-                // % Presença
-                const tdPercPresenca = document.createElement('td');
-                const percPresenca = percentuais.Presente || 0;
-                tdPercPresenca.innerHTML = `<strong>${percPresenca}%</strong>`;
-                tdPercPresenca.classList.add('col-percentual');
-                
-                // Cor baseada no percentual
-                if (percPresenca >= 95) {
-                    tdPercPresenca.classList.add('percentual-alta');
-                } else if (percPresenca >= 85) {
-                    tdPercPresenca.classList.add('percentual-media');
-                } else {
-                    tdPercPresenca.classList.add('percentual-baixa');
-                }
-                
-                tr.appendChild(tdPercPresenca);
-                
-                // Percentuais dos motivos
-                motivos.forEach(motivo => {
-                    const td = document.createElement('td');
-                    const perc = percentuais[motivo] || 0;
-                    td.textContent = `${perc}%`;
-                    td.classList.add('col-percentual');
-                    tr.appendChild(td);
-                });
                 
                 tbody.appendChild(tr);
             });
             
-            // ✅ ADICIONAR LINHA DE TOTAL
+            // Adicionar linha de TOTAL
             const trTotal = document.createElement('tr');
             trTotal.classList.add('linha-total');
             
@@ -350,31 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
             tdTotalGeral.innerHTML = `<strong>${totalRegistros}</strong>`;
             trTotal.appendChild(tdTotalGeral);
             
-            // % Presença total
-            const percPresencaTotal = totalRegistros > 0 ? ((totalPresentes / totalRegistros) * 100).toFixed(1) : 0;
-            const tdPercTotal = document.createElement('td');
-            tdPercTotal.innerHTML = `<strong>${percPresencaTotal}%</strong>`;
-            tdPercTotal.classList.add('col-percentual');
-            
-            if (percPresencaTotal >= 95) {
-                tdPercTotal.classList.add('percentual-alta');
-            } else if (percPresencaTotal >= 85) {
-                tdPercTotal.classList.add('percentual-media');
-            } else {
-                tdPercTotal.classList.add('percentual-baixa');
-            }
-            
-            trTotal.appendChild(tdPercTotal);
-            
-            // Percentuais totais dos motivos
-            motivos.forEach(motivo => {
-                const td = document.createElement('td');
-                const percMotivo = totalRegistros > 0 ? ((totaisMotivos[motivo] / totalRegistros) * 100).toFixed(1) : 0;
-                td.innerHTML = `<strong>${percMotivo}%</strong>`;
-                td.classList.add('col-percentual');
-                trTotal.appendChild(td);
-            });
-            
             tbody.appendChild(trTotal);
             
             // Mostrar tabela
@@ -390,4 +297,4 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro completo:', error);
         }
     }
-}) ;
+});
