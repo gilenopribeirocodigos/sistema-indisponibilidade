@@ -195,8 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             document.getElementById('sup-total-registros').textContent = data.total_geral || 0;
             
-            // Lista de motivos na ordem correta
-            const motivos = [
+            // Lista de motivos na ordem preferencial (mas usando os nomes que vêm do backend)
+            const ordemPreferencial = [
                 'Atestado Médico',
                 'Falta Injustificada',
                 'Viatura com Defeito',
@@ -207,6 +207,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Licença',
                 'Outro'
             ];
+            
+            // Pegar todos os motivos únicos dos dados
+            const motivosEncontrados = new Set();
+            data.dados.forEach(sup => {
+                Object.keys(sup.contadores || {}).forEach(motivo => {
+                    if (motivo !== 'Presente' && motivo !== 'Não registrado') {
+                        motivosEncontrados.add(motivo);
+                    }
+                });
+            });
+            
+            console.log('Motivos encontrados nos dados:', Array.from(motivosEncontrados));
+            
+            // Ordenar motivos: primeiro os da ordem preferencial, depois outros alfabeticamente
+            const motivos = [];
+            ordemPreferencial.forEach(m => {
+                if (motivosEncontrados.has(m)) {
+                    motivos.push(m);
+                    motivosEncontrados.delete(m);
+                }
+            });
+            // Adicionar motivos restantes em ordem alfabética
+            motivos.push(...Array.from(motivosEncontrados).sort());
+            
+            // ========================================
+            // CRIAR CABEÇALHO DINÂMICO
+            // ========================================
+            const thead = document.getElementById('cabecalho-supervisor');
+            thead.innerHTML = '';
+            
+            // Criar cabeçalho: Supervisor + Presentes + Motivos + Total + Percentuais
+            let th = document.createElement('th');
+            th.textContent = 'Supervisor';
+            thead.appendChild(th);
+            
+            th = document.createElement('th');
+            th.textContent = 'Presentes';
+            thead.appendChild(th);
+            
+            // Colunas de motivos
+            motivos.forEach(motivo => {
+                th = document.createElement('th');
+                // Quebrar palavras compostas
+                const textoQuebrado = motivo.replace(/\s+/g, '<br>');
+                th.innerHTML = textoQuebrado;
+                thead.appendChild(th);
+            });
+            
+            th = document.createElement('th');
+            th.textContent = 'Total';
+            thead.appendChild(th);
+            
+            // Colunas de percentuais
+            th = document.createElement('th');
+            th.className = 'col-percentual';
+            th.innerHTML = '%<br>Presentes';
+            thead.appendChild(th);
+            
+            motivos.forEach(motivo => {
+                th = document.createElement('th');
+                th.className = 'col-percentual';
+                const textoQuebrado = '% ' + motivo.replace(/\s+/g, '<br>');
+                th.innerHTML = textoQuebrado;
+                thead.appendChild(th);
+            });
             
             // ========================================
             // RENDERIZAR DADOS
