@@ -1668,6 +1668,9 @@ def relatorio_geral(
         })
 
 
+# FUNÇÃO CORRIGIDA COM DEBUG
+# Substitua a função relatorio_por_supervisor no main.py pela versão abaixo
+
 @app.get("/api/relatorio-por-supervisor")
 def relatorio_por_supervisor(
     request: Request,
@@ -1675,7 +1678,7 @@ def relatorio_por_supervisor(
     data_fim: str = None,
     db: Session = Depends(get_db)
 ):
-    """API para gerar relatório POR SUPERVISOR"""
+    """API para gerar relatório POR SUPERVISOR - COM DEBUG"""
     
     # Verificar autenticação
     if not verificar_autenticacao(request):
@@ -1700,6 +1703,10 @@ def relatorio_por_supervisor(
             data_inicio_obj = date.today()
             data_fim_obj = date.today()
         
+        print(f"\n{'='*60}")
+        print(f"DEBUG RELATÓRIO - Período: {data_inicio_obj} até {data_fim_obj}")
+        print(f"{'='*60}")
+        
         # Criar lista de datas no período
         dias_periodo = []
         data_atual = data_inicio_obj
@@ -1707,25 +1714,60 @@ def relatorio_por_supervisor(
             dias_periodo.append(data_atual)
             data_atual += timedelta(days=1)
         
+        print(f"Total de dias no período: {len(dias_periodo)}")
+        
         # Buscar todos os supervisores
         supervisores = db.query(EstruturaEquipes.superv_campo).filter(
             EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
         ).distinct().all()
         supervisores = [s[0] for s in supervisores if s[0]]
         
+        print(f"Total de supervisores: {len(supervisores)}")
+        
         # Buscar todos os motivos possíveis
         motivos_db = db.query(MotivoIndisponibilidade.descricao).all()
         todos_motivos = set([m[0] for m in motivos_db])
+        
+        print(f"Motivos cadastrados: {list(todos_motivos)}")
+        
+        # TESTE: Verificar se há indisponibilidades no período
+        total_indisp_periodo = db.query(Indisponibilidade).filter(
+            Indisponibilidade.data >= data_inicio_obj,
+            Indisponibilidade.data <= data_fim_obj
+        ).count()
+        print(f"Total de indisponibilidades no período: {total_indisp_periodo}")
+        
+        if total_indisp_periodo > 0:
+            # Mostrar exemplos
+            exemplos = db.query(
+                Indisponibilidade.data,
+                Indisponibilidade.eletricista_id,
+                MotivoIndisponibilidade.descricao
+            ).join(
+                MotivoIndisponibilidade,
+                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+            ).filter(
+                Indisponibilidade.data >= data_inicio_obj,
+                Indisponibilidade.data <= data_fim_obj
+            ).limit(5).all()
+            
+            print("\nExemplos de indisponibilidades no período:")
+            for data, elet_id, motivo in exemplos:
+                print(f"  - Data: {data}, Eletricista ID: {elet_id}, Motivo: {motivo}")
         
         dados_supervisores = []
         
         # Para cada supervisor
         for supervisor in supervisores:
+            print(f"\n--- Supervisor: {supervisor} ---")
+            
             # Total de eletricistas desse supervisor
             total_eletricistas_sup = db.query(EstruturaEquipes).filter(
                 EstruturaEquipes.superv_campo == supervisor,
                 EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
             ).count()
+            
+            print(f"Total de eletricistas: {total_eletricistas_sup}")
             
             # Contadores por motivo
             contadores = {
@@ -1747,7 +1789,7 @@ def relatorio_por_supervisor(
                 ids_presentes = set([p[0] for p in presentes])
                 contadores["Presente"] += len(ids_presentes)
                 
-                # 2. INDISPONÍVEIS
+                # 2. INDISPONÍVEIS - COM DEBUG
                 indisponiveis = db.query(
                     Indisponibilidade.eletricista_id,
                     MotivoIndisponibilidade.descricao
@@ -1761,6 +1803,11 @@ def relatorio_por_supervisor(
                     Indisponibilidade.data == dia,
                     EstruturaEquipes.superv_campo == supervisor
                 ).all()
+                
+                if indisponiveis:
+                    print(f"  Dia {dia}: Encontrados {len(indisponiveis)} indisponíveis")
+                    for elet_id, motivo in indisponiveis:
+                        print(f"    - Eletricista ID: {elet_id}, Motivo: '{motivo}'")
                 
                 ids_indisponiveis = set([i[0] for i in indisponiveis])
                 
@@ -1780,6 +1827,8 @@ def relatorio_por_supervisor(
                 
                 contadores["Não registrado"] += nao_registrados
             
+            print(f"Contadores finais: {contadores}")
+            
             # Calcular totais
             total_registros = sum(contadores.values())
             percentual_presenca = (contadores["Presente"] / total_registros * 100) if total_registros > 0 else 0
@@ -1798,6 +1847,10 @@ def relatorio_por_supervisor(
         # Calcular totais gerais
         total_geral = sum([s['total_registros'] for s in dados_supervisores])
         
+        print(f"\n{'='*60}")
+        print(f"TOTAL GERAL: {total_geral}")
+        print(f"{'='*60}\n")
+        
         return JSONResponse({
             "success": True,
             "periodo": {
@@ -1811,6 +1864,10 @@ def relatorio_por_supervisor(
         })
         
     except Exception as e:
+        print(f"\n❌ ERRO: {e}")
+        import traceback
+        traceback.print_exc()
+        
         return JSONResponse({
             "success": False,
             "erro": str(e)
@@ -1823,3 +1880,4 @@ def relatorio_por_supervisor(
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
