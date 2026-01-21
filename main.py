@@ -1873,6 +1873,130 @@ def relatorio_por_supervisor(
             "erro": str(e)
         })
 
+# ==========================================
+# ROTA DE DEBUG - ADICIONE ISSO NO main.py
+# Copie todo este código e cole ANTES da linha "if __name__ == '__main__':"
+# ==========================================
+
+@app.get("/api/debug-indisponibilidades")
+def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
+    """
+    Rota de DEBUG para verificar indisponibilidades
+    Acesse: https://seu-site.onrender.com/api/debug-indisponibilidades
+    """
+    from models import Indisponibilidade, MotivoIndisponibilidade, EstruturaEquipes
+    from datetime import date
+    
+    resultado = {
+        "status": "DEBUG ATIVO",
+        "data_atual": str(date.today()),
+        "resultados": {}
+    }
+    
+    try:
+        # 1. Total de registros
+        total_indisp = db.query(Indisponibilidade).count()
+        resultado["resultados"]["total_indisponibilidades"] = total_indisp
+        
+        if total_indisp == 0:
+            resultado["resultados"]["problema"] = "⚠️ NÃO HÁ REGISTROS DE INDISPONIBILIDADE!"
+            resultado["resultados"]["solucao"] = "Registre uma indisponibilidade pelo sistema"
+            return JSONResponse(resultado)
+        
+        # 2. Últimos 5 registros
+        ultimos = db.query(
+            Indisponibilidade.id,
+            Indisponibilidade.data,
+            Indisponibilidade.eletricista_id,
+            Indisponibilidade.motivo_id
+        ).order_by(Indisponibilidade.id.desc()).limit(5).all()
+        
+        resultado["resultados"]["ultimos_5_registros"] = [
+            {
+                "id": r[0],
+                "data": str(r[1]),
+                "eletricista_id": r[2],
+                "motivo_id": r[3]
+            }
+            for r in ultimos
+        ]
+        
+        # 3. Motivos cadastrados
+        motivos = db.query(MotivoIndisponibilidade.id, MotivoIndisponibilidade.descricao).all()
+        resultado["resultados"]["motivos_cadastrados"] = [
+            {"id": m[0], "descricao": m[1]}
+            for m in motivos
+        ]
+        
+        # 4. Teste da consulta (hoje)
+        hoje = date.today()
+        
+        indisponiveis_hoje = db.query(
+            Indisponibilidade.eletricista_id,
+            MotivoIndisponibilidade.descricao,
+            EstruturaEquipes.colaborador,
+            EstruturaEquipes.superv_campo
+        ).join(
+            MotivoIndisponibilidade,
+            Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+        ).join(
+            EstruturaEquipes,
+            Indisponibilidade.eletricista_id == EstruturaEquipes.id
+        ).filter(
+            Indisponibilidade.data == hoje
+        ).all()
+        
+        resultado["resultados"]["indisponibilidades_hoje"] = {
+            "total": len(indisponiveis_hoje),
+            "registros": [
+                {
+                    "eletricista_id": r[0],
+                    "motivo": r[1],
+                    "colaborador": r[2],
+                    "supervisor": r[3]
+                }
+                for r in indisponiveis_hoje
+            ]
+        }
+        
+        # 5. Verificar outras datas
+        outras_datas = db.query(
+            Indisponibilidade.data,
+            MotivoIndisponibilidade.descricao
+        ).join(
+            MotivoIndisponibilidade,
+            Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+        ).filter(
+            Indisponibilidade.data != hoje
+        ).order_by(Indisponibilidade.data.desc()).limit(10).all()
+        
+        resultado["resultados"]["outras_datas"] = [
+            {"data": str(r[0]), "motivo": r[1]}
+            for r in outras_datas
+        ]
+        
+        # 6. Análise
+        if len(indisponiveis_hoje) == 0 and total_indisp > 0:
+            resultado["resultados"]["diagnostico"] = {
+                "problema": "⚠️ HÁ REGISTROS, MAS NENHUM PARA HOJE!",
+                "possivel_causa": "As indisponibilidades foram registradas em outras datas",
+                "solucao": "Registre uma indisponibilidade para HOJE ou gere o relatório para as datas que têm registros"
+            }
+        elif len(indisponiveis_hoje) > 0:
+            resultado["resultados"]["diagnostico"] = {
+                "status": "✅ TUDO OK! Há registros para hoje",
+                "proxima_acao": "O problema deve estar na função do relatório por supervisor"
+            }
+        
+        return JSONResponse(resultado)
+        
+    except Exception as e:
+        resultado["erro"] = str(e)
+        import traceback
+        resultado["traceback"] = traceback.format_exc()
+        return JSONResponse(resultado)
+
+
 # ========================================
 # EXECUTAR SERVIDOR
 # ========================================
@@ -1880,4 +2004,5 @@ def relatorio_por_supervisor(
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
