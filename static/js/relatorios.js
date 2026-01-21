@@ -253,6 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.appendChild(tdTotalReg);
                 totalRegistros += totalReg;
                 
+                // === COLUNAS DE PERCENTUAL ===
+                
+                // % Presentes
+                const percPresentes = totalReg > 0 ? ((qtdPresentes / totalReg) * 100).toFixed(1) : 0;
+                const tdPercPresentes = document.createElement('td');
+                tdPercPresentes.textContent = `${percPresentes}%`;
+                tdPercPresentes.classList.add('col-percentual');
+                tr.appendChild(tdPercPresentes);
+                
+                // % dos motivos
+                motivos.forEach(motivo => {
+                    const qtd = contadores[motivo] || 0;
+                    const perc = totalReg > 0 ? ((qtd / totalReg) * 100).toFixed(1) : 0;
+                    const td = document.createElement('td');
+                    td.textContent = `${perc}%`;
+                    td.classList.add('col-percentual');
+                    tr.appendChild(td);
+                });
+                
                 tbody.appendChild(tr);
             });
             
@@ -281,6 +300,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const tdTotalGeral = document.createElement('td');
             tdTotalGeral.innerHTML = `<strong>${totalRegistros}</strong>`;
             trTotal.appendChild(tdTotalGeral);
+            
+            // === PERCENTUAIS TOTAIS ===
+            
+            // % Presentes total
+            const percPresentesTotal = totalRegistros > 0 ? ((totalPresentes / totalRegistros) * 100).toFixed(1) : 0;
+            const tdPercPresentesTotal = document.createElement('td');
+            tdPercPresentesTotal.innerHTML = `<strong>${percPresentesTotal}%</strong>`;
+            tdPercPresentesTotal.classList.add('col-percentual');
+            trTotal.appendChild(tdPercPresentesTotal);
+            
+            // % dos motivos totais
+            motivos.forEach(motivo => {
+                const perc = totalRegistros > 0 ? ((totaisMotivos[motivo] / totalRegistros) * 100).toFixed(1) : 0;
+                const td = document.createElement('td');
+                td.innerHTML = `<strong>${perc}%</strong>`;
+                td.classList.add('col-percentual');
+                trTotal.appendChild(td);
+            });
             
             tbody.appendChild(trTotal);
             
