@@ -282,6 +282,29 @@
     min-width: 900px;
 }
 
+/* Compressão para tabela de supervisor */
+.tabela-wide th,
+.tabela-wide td {
+    padding: 8px 5px !important;
+    font-size: 11px !important;
+    white-space: normal !important;
+    text-align: center;
+    min-width: 42px;
+}
+
+.tabela-wide th {
+    line-height: 1.2;
+    word-wrap: break-word;
+    font-size: 10px !important;
+}
+
+.tabela-wide tbody td:first-child {
+    text-align: left;
+    min-width: 70px;
+    font-size: 11px !important;
+    font-weight: bold;
+}
+
 /* Percentual com cor */
 .percentual-alta {
     color: #28a745;
