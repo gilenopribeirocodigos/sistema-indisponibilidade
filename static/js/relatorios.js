@@ -215,21 +215,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Todas as chaves nos contadores:', Object.keys(data.dados[0].contadores));
             }
             
-            // Função para encontrar motivo nos contadores (case insensitive)
+            // Função para remover acentos
+            function removerAcentos(texto) {
+                return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            }
+            
+            // Função para encontrar motivo nos contadores (ignora acentos e maiúsculas)
             function buscarMotivo(contadores, motivoProcurado) {
                 // Tentar exato primeiro
                 if (contadores[motivoProcurado] !== undefined) {
                     return contadores[motivoProcurado];
                 }
                 
-                // Tentar case-insensitive
-                const motivoLower = motivoProcurado.toLowerCase();
+                // Normalizar o motivo procurado (sem acentos, minúsculas)
+                const motivoNormalizado = removerAcentos(motivoProcurado.toLowerCase());
+                
+                // Procurar nos contadores
                 for (let chave in contadores) {
-                    if (chave.toLowerCase() === motivoLower) {
+                    const chaveNormalizada = removerAcentos(chave.toLowerCase());
+                    if (chaveNormalizada === motivoNormalizado) {
+                        console.log(`✅ Match encontrado: "${motivoProcurado}" = "${chave}"`);
                         return contadores[chave];
                     }
                 }
                 
+                console.log(`⚠️ Não encontrado: "${motivoProcurado}"`);
                 return 0;
             }
             
