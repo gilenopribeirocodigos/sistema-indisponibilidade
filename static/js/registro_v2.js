@@ -38,65 +38,106 @@ class RegistroV2 {
     }
     
     // ==========================================
-    // SEÇÃO 1: FREQUÊNCIA
+    // SEÇÃO 1: FREQUÊNCIA - ATÉ 2 SELEÇÕES
     // ==========================================
     setupFrequencia() {
         const checkboxes = document.querySelectorAll('.eletricista-checkbox');
         const eletricistagInfo = document.getElementById('eletricista-info');
+        const contadorSelecao = document.getElementById('contador-selecao');
         const prefixoInput = document.getElementById('prefixo-frequencia');
         const btnAssociar = document.getElementById('btn-associar');
         const btnSalvarFrequencia = document.getElementById('btn-salvar-frequencia');
         const btnLimparTodas = document.getElementById('btn-limpar-todas');
         
-        let eletricistaSelecionado = null;
+        let eletricistaSelecionados = []; // Array para até 2 eletricistas
         
-        // Permitir apenas 1 checkbox marcado por vez
+        // Função para atualizar interface
+        const atualizarInterface = () => {
+            const qtdSelecionados = eletricistaSelecionados.length;
+            
+            // Atualizar contador
+            contadorSelecao.textContent = `${qtdSelecionados}/2`;
+            contadorSelecao.className = 'contador-badge';
+            if (qtdSelecionados === 2) {
+                contadorSelecao.classList.add('contador-completo');
+            } else if (qtdSelecionados === 1) {
+                contadorSelecao.classList.add('contador-parcial');
+            }
+            
+            // Desabilitar outros checkboxes se já tiver 2 selecionados
+            checkboxes.forEach(cb => {
+                if (!cb.checked && qtdSelecionados >= 2) {
+                    cb.disabled = true;
+                    cb.closest('.eletricista-card').style.opacity = '0.5';
+                } else if (!cb.checked) {
+                    cb.disabled = false;
+                    cb.closest('.eletricista-card').style.opacity = '1';
+                }
+            });
+            
+            // Atualizar painel de informações
+            if (qtdSelecionados === 0) {
+                eletricistagInfo.innerHTML = 'Selecione até 2 eletricistas acima';
+                eletricistagInfo.classList.remove('info-preenchida');
+                eletricistagInfo.classList.add('info-vazia');
+                prefixoInput.value = '';
+                btnAssociar.disabled = true;
+            } else {
+                const htmlEletricistas = eletricistaSelecionados.map((elet, index) => `
+                    <div class="eletricista-selecionado">
+                        <strong>${index + 1}. ${elet.nome}</strong><br>
+                        <small>Mat: ${elet.matricula} | Base: ${elet.base}</small>
+                    </div>
+                `).join('');
+                
+                eletricistagInfo.innerHTML = htmlEletricistas;
+                eletricistagInfo.classList.add('info-preenchida');
+                eletricistagInfo.classList.remove('info-vazia');
+                
+                // Sugerir prefixo do primeiro selecionado
+                if (!prefixoInput.value) {
+                    prefixoInput.value = eletricistaSelecionados[0].prefixo;
+                }
+                
+                btnAssociar.disabled = false;
+            }
+        };
+        
+        // Evento de mudança nos checkboxes
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
+                const card = e.target.closest('.eletricista-card');
+                const eletData = {
+                    id: card.dataset.id,
+                    nome: e.target.dataset.nome,
+                    matricula: e.target.dataset.matricula,
+                    prefixo: e.target.dataset.prefixo,
+                    base: e.target.dataset.base
+                };
+                
                 if (e.target.checked) {
-                    // Desmarcar todos os outros
-                    checkboxes.forEach(cb => {
-                        if (cb !== e.target) cb.checked = false;
-                    });
-                    
-                    // Guardar eletricista selecionado
-                    eletricistaSelecionado = {
-                        id: e.target.closest('.eletricista-card').dataset.id,
-                        nome: e.target.dataset.nome,
-                        matricula: e.target.dataset.matricula,
-                        prefixo: e.target.dataset.prefixo,
-                        base: e.target.dataset.base
-                    };
-                    
-                    // Atualizar painel de informações
-                    eletricistagInfo.innerHTML = `
-                        <strong>${eletricistaSelecionado.nome}</strong><br>
-                        <small>Mat: ${eletricistaSelecionado.matricula} | Base: ${eletricistaSelecionado.base}</small>
-                    `;
-                    eletricistagInfo.classList.add('info-preenchida');
-                    eletricistagInfo.classList.remove('info-vazia');
-                    
-                    // Sugerir prefixo
-                    prefixoInput.value = eletricistaSelecionado.prefixo;
-                    
-                    // Habilitar botão associar
-                    btnAssociar.disabled = false;
-                    
+                    // Adicionar se ainda não tiver 2
+                    if (eletricistaSelecionados.length < 2) {
+                        eletricistaSelecionados.push(eletData);
+                    } else {
+                        // Não deixar marcar mais de 2
+                        e.target.checked = false;
+                        return;
+                    }
                 } else {
-                    // Se desmarcou, limpar
-                    eletricistaSelecionado = null;
-                    eletricistagInfo.innerHTML = 'Selecione um eletricista acima';
-                    eletricistagInfo.classList.remove('info-preenchida');
-                    eletricistagInfo.classList.add('info-vazia');
-                    prefixoInput.value = '';
-                    btnAssociar.disabled = true;
+                    // Remover da lista
+                    eletricistaSelecionados = eletricistaSelecionados.filter(
+                        elet => elet.id !== eletData.id
+                    );
                 }
+                
+                atualizarInterface();
             });
         });
         
         // Botão Associar
         btnAssociar.addEventListener('click', () => {
-            if (!eletricistaSelecionado) return;
+            if (eletricistaSelecionados.length === 0) return;
             
             const prefixo = prefixoInput.value.trim();
             
@@ -106,36 +147,36 @@ class RegistroV2 {
                 return;
             }
             
-            // Verificar se já foi associado
-            const jaAssociado = this.associacoesTemporarias.find(
-                a => a.eletricista_id === eletricistaSelecionado.id
-            );
-            
-            if (jaAssociado) {
-                alert('⚠️ Este eletricista já foi associado!');
-                return;
-            }
-            
-            // Adicionar à lista temporária
-            this.associacoesTemporarias.push({
-                eletricista_id: eletricistaSelecionado.id,
-                nome: eletricistaSelecionado.nome,
-                matricula: eletricistaSelecionado.matricula,
-                prefixo: prefixo
+            // Adicionar CADA eletricista à lista temporária
+            eletricistaSelecionados.forEach(eletricista => {
+                // Verificar se já foi associado
+                const jaAssociado = this.associacoesTemporarias.find(
+                    a => a.eletricista_id === eletricista.id
+                );
+                
+                if (!jaAssociado) {
+                    this.associacoesTemporarias.push({
+                        eletricista_id: eletricista.id,
+                        nome: eletricista.nome,
+                        matricula: eletricista.matricula,
+                        prefixo: prefixo
+                    });
+                    
+                    // Remover card da lista
+                    const card = document.querySelector(`.eletricista-card[data-id="${eletricista.id}"]`);
+                    card.style.display = 'none';
+                }
             });
             
-            // Remover card da lista (eletricista "acabou")
-            const card = document.querySelector(`.eletricista-card[data-id="${eletricistaSelecionado.id}"]`);
-            card.style.display = 'none';
-            
             // Limpar seleção
-            checkboxes.forEach(cb => cb.checked = false);
-            eletricistagInfo.innerHTML = 'Selecione um eletricista acima';
-            eletricistagInfo.classList.remove('info-preenchida');
-            eletricistagInfo.classList.add('info-vazia');
-            prefixoInput.value = '';
-            btnAssociar.disabled = true;
-            eletricistaSelecionado = null;
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                cb.disabled = false;
+                cb.closest('.eletricista-card').style.opacity = '1';
+            });
+            
+            eletricistaSelecionados = [];
+            atualizarInterface();
             
             // Atualizar lista de associações
             this.atualizarListaAssociacoes();
@@ -527,12 +568,3 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
-
-
-
-
-
-
-
-
-
