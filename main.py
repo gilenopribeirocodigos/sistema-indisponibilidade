@@ -90,6 +90,117 @@ def verificar_autenticacao(request: Request):
     """
     return 'user_id' in request.session
 
+# ==========================================
+# FUNÇÕES DE HISTÓRICO
+# ==========================================
+
+def arquivar_estrutura_atual(db, usuario_id=None, observacao=None):
+    """Copia estrutura atual para histórico"""
+    from models import EstruturaEquipes, EstruturaEquipesHistorico
+    from datetime import datetime
+    
+    try:
+        registros_atuais = db.query(EstruturaEquipes).all()
+        
+        if not registros_atuais:
+            return 0
+        
+        total_copiados = 0
+        data_carga_atual = datetime.now()
+        
+        for registro in registros_atuais:
+            historico = EstruturaEquipesHistorico(
+                data_carga=data_carga_atual,
+                usuario_carga=usuario_id,
+                observacao=observacao,
+                id_original=registro.id,
+                matricula=registro.matricula,
+                colaborador=registro.colaborador,
+                polo=registro.polo,
+                superv_campo=registro.superv_campo,
+                base=registro.base,
+                prefixo=registro.prefixo,
+                descr_situacao=registro.descr_situacao
+            )
+            
+            db.add(historico)
+            total_copiados += 1
+        
+        db.commit()
+        return total_copiados
+        
+    except Exception as e:
+        db.rollback()
+        raise
+
+
+def listar_datas_historico(db):
+    """Lista todas as datas de carga disponíveis"""
+    from models import EstruturaEquipesHistorico
+    from sqlalchemy import func
+    
+    datas = db.query(
+        EstruturaEquipesHistorico.data_carga,
+        func.count(EstruturaEquipesHistorico.id_historico).label('total_registros'),
+        EstruturaEquipesHistorico.usuario_carga,
+        EstruturaEquipesHistorico.observacao
+    ).group_by(
+        EstruturaEquipesHistorico.data_carga,
+        EstruturaEquipesHistorico.usuario_carga,
+        EstruturaEquipesHistorico.observacao
+    ).order_by(
+        EstruturaEquipesHistorico.data_carga.desc()
+    ).all()
+    
+    return [
+        {
+            "data_carga": d[0].strftime('%d/%m/%Y %H:%M:%S'),
+            "total_registros": d[1],
+            "usuario": d[2] or "Sistema",
+            "observacao": d[3] or ""
+        }
+        for d in datas
+    ]
+
+
+def restaurar_historico(db, data_carga):
+    """Restaura estrutura de uma data específica"""
+    from models import EstruturaEquipes, EstruturaEquipesHistorico
+    
+    try:
+        historicos = db.query(EstruturaEquipesHistorico).filter(
+            EstruturaEquipesHistorico.data_carga == data_carga
+        ).all()
+        
+        if not historicos:
+            return 0
+        
+        db.query(EstruturaEquipes).delete()
+        
+        total_restaurados = 0
+        for hist in historicos:
+            registro = EstruturaEquipes(
+                matricula=hist.matricula,
+                colaborador=hist.colaborador,
+                polo=hist.polo,
+                superv_campo=hist.superv_campo,
+                base=hist.base,
+                prefixo=hist.prefixo,
+                descr_situacao=hist.descr_situacao
+            )
+            
+            db.add(registro)
+            total_restaurados += 1
+        
+        db.commit()
+        return total_restaurados
+        
+    except Exception as e:
+        db.rollback()
+        raise
+
+
+
 # ========================================
 # ROTAS PÚBLICAS (não precisa estar logado)
 # ========================================
@@ -944,15 +1055,38 @@ def importar_csv_page(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/api/importar-eletricistas")
 async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Importar eletricistas de arquivo CSV com UPSERT (preserva IDs)"""
+    """Importar eletricistas de arquivo CSV com HISTÓRICO"""
+    
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
     
     from models import EstruturaEquipes
     import csv
     import io
     
     try:
+        # ========================================
+        # PASSO 1: ARQUIVAR ESTRUTURA ATUAL
+        # ========================================
+        print("\n" + "="*60)
+        print("📦 ARQUIVANDO ESTRUTURA ATUAL NO HISTÓRICO...")
+        print("="*60)
+        
+        total_arquivados = arquivar_estrutura_atual(
+            db=db,
+            usuario_id=usuario.id if usuario else None,
+            observacao="Importação de novo CSV"
+        )
+        
+        print(f"✅ {total_arquivados} registros arquivados")
+        
+        # ========================================
+        # PASSO 2: IMPORTAR NOVOS DADOS
+        # ========================================
+        print("\n📥 Importando novos dados do CSV...")
+        
         # Ler arquivo
         contents = await arquivo.read()
         
@@ -992,7 +1126,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
                 eletricista_existente.superv_operacao = str(row.get('superv_operacao', '')).strip()
                 eletricista_existente.coordenador = str(row.get('coordenador', '')).strip()
                 eletricista_existente.descr_secao = str(row.get('descr_secao', '')).strip()
-                eletricista_existente.descr_situacao = str(row.get('descr_situacao', '')).strip()  # ← ATUALIZA STATUS
+                eletricista_existente.descr_situacao = str(row.get('descr_situacao', '')).strip()
                 eletricista_existente.placas = str(row.get('placas', '')).strip()
                 eletricista_existente.tipo_equipe = str(row.get('tipo_equipe', '')).strip()
                 eletricista_existente.processo_equipe = str(row.get('processo_equipe', '')).strip()
@@ -1011,7 +1145,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
                     superv_operacao=str(row.get('superv_operacao', '')).strip(),
                     coordenador=str(row.get('coordenador', '')).strip(),
                     descr_secao=str(row.get('descr_secao', '')).strip(),
-                    descr_situacao=str(row.get('descr_situacao', '')).strip(),  # ← STATUS DO CSV
+                    descr_situacao=str(row.get('descr_situacao', '')).strip(),
                     placas=str(row.get('placas', '')).strip(),
                     tipo_equipe=str(row.get('tipo_equipe', '')).strip(),
                     processo_equipe=str(row.get('processo_equipe', '')).strip()
@@ -1022,11 +1156,15 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
         # Commit
         db.commit()
         
+        print(f"✅ {total_novos} novos, {total_atualizados} atualizados")
+        print("="*60 + "\n")
+        
         return JSONResponse({
             "success": True,
+            "total_arquivados": total_arquivados,
             "total_novos": total_novos,
             "total_atualizados": total_atualizados,
-            "mensagem": f"✅ Importação concluída! {total_novos} novos, {total_atualizados} atualizados."
+            "mensagem": f"✅ Importação concluída!\n\n📦 {total_arquivados} registros arquivados\n📥 {total_novos} novos + {total_atualizados} atualizados"
         })
         
     except Exception as e:
@@ -1035,6 +1173,7 @@ async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...
             "success": False,
             "erro": f"Erro: {str(e)}"
         })
+
 
 @app.get("/api/teste-eletricistas")
 def teste_eletricistas(db: Session = Depends(get_db)):
@@ -2004,5 +2143,6 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
