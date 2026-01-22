@@ -2,28 +2,42 @@ from sqlalchemy import Column, Integer, String, Boolean, Date, Text, ForeignKey,
 from sqlalchemy.sql import func
 from database import Base
 
-# ============================================
-# CLASSE 1: EstruturaEquipes
-# Representa a tabela ESTRUTURA_EQUIPES
-# ============================================
-class EstruturaEquipes(Base):
-    __tablename__ = 'estrutura_equipes'
+# ==========================================
+# HISTÓRICO DE ESTRUTURA DE EQUIPES
+# ==========================================
+
+class EstruturaEquipesHistorico(Base):
+    __tablename__ = "estrutura_equipes_historico"
     
-    id = Column(Integer, primary_key=True, index=True)
-    regional = Column(String)
-    polo = Column(String)
-    base = Column(String)
-    prefixo = Column(String, index=True)
-    matricula = Column(String, index=True)
-    colaborador = Column(String, index=True)
-    descr_secao = Column(String)
-    descr_situacao = Column(String)
-    placas = Column(String)
-    tipo_equipe = Column(String)
-    processo_equipe = Column(String)
-    superv_campo = Column(String)
-    superv_operacao = Column(String)
-    coordenador = Column(String)
+    # ========================================
+    # CAMPOS DE CONTROLE DO HISTÓRICO
+    # ========================================
+    id_historico = Column(Integer, primary_key=True, autoincrement=True)
+    data_carga = Column(DateTime, nullable=False, default=datetime.now)
+    usuario_carga = Column(Integer)
+    observacao = Column(String(500))
+    
+    # ========================================
+    # CAMPOS DA ESTRUTURA ORIGINAL (TODOS!)
+    # ========================================
+    id_original = Column(Integer)
+    regional = Column(String(100))
+    polo = Column(String(100))
+    base = Column(String(100))
+    prefixo = Column(String(50))
+    matricula = Column(String(20))
+    colaborador = Column(String(200))
+    descr_secao = Column(String(100))
+    descr_situacao = Column(String(50))
+    placas = Column(String(100))
+    tipo_equipe = Column(String(100))
+    processo_equipe = Column(String(100))
+    superv_campo = Column(String(200))
+    superv_operacao = Column(String(200))
+    coordenador = Column(String(200))
+    
+    def __repr__(self):
+        return f"<Historico(data_carga={self.data_carga}, colaborador={self.colaborador})>"
 
 
 # ============================================
@@ -290,6 +304,7 @@ def listar_datas_historico(db):
         }
         for d in datas
     ]
+
 
 
 
