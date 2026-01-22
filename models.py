@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, Text, ForeignKey, TIMESTAMP, DateTime
 from sqlalchemy.sql import func
 from database import Base
+from datetime import datetime  # ← ADICIONE ESTA LINHA
 
 # ==========================================
 # HISTÓRICO DE ESTRUTURA DE EQUIPES
@@ -304,6 +305,7 @@ def listar_datas_historico(db):
         }
         for d in datas
     ]
+
 
 
 
