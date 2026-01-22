@@ -110,17 +110,27 @@ def arquivar_estrutura_atual(db, usuario_id=None, observacao=None):
         
         for registro in registros_atuais:
             historico = EstruturaEquipesHistorico(
+                # Campos de controle
                 data_carga=data_carga_atual,
                 usuario_carga=usuario_id,
                 observacao=observacao,
+                
+                # Campos da estrutura original (TODOS!)
                 id_original=registro.id,
-                matricula=registro.matricula,
-                colaborador=registro.colaborador,
+                regional=registro.regional,
                 polo=registro.polo,
-                superv_campo=registro.superv_campo,
                 base=registro.base,
                 prefixo=registro.prefixo,
-                descr_situacao=registro.descr_situacao
+                matricula=registro.matricula,
+                colaborador=registro.colaborador,
+                descr_secao=registro.descr_secao,
+                descr_situacao=registro.descr_situacao,
+                placas=registro.placas,
+                tipo_equipe=registro.tipo_equipe,
+                processo_equipe=registro.processo_equipe,
+                superv_campo=registro.superv_campo,
+                superv_operacao=registro.superv_operacao,
+                coordenador=registro.coordenador
             )
             
             db.add(historico)
@@ -132,7 +142,6 @@ def arquivar_estrutura_atual(db, usuario_id=None, observacao=None):
     except Exception as e:
         db.rollback()
         raise
-
 
 def listar_datas_historico(db):
     """Lista todas as datas de carga disponíveis"""
@@ -162,7 +171,6 @@ def listar_datas_historico(db):
         for d in datas
     ]
 
-
 def restaurar_historico(db, data_carga):
     """Restaura estrutura de uma data específica"""
     from models import EstruturaEquipes, EstruturaEquipesHistorico
@@ -180,13 +188,20 @@ def restaurar_historico(db, data_carga):
         total_restaurados = 0
         for hist in historicos:
             registro = EstruturaEquipes(
-                matricula=hist.matricula,
-                colaborador=hist.colaborador,
+                regional=hist.regional,
                 polo=hist.polo,
-                superv_campo=hist.superv_campo,
                 base=hist.base,
                 prefixo=hist.prefixo,
-                descr_situacao=hist.descr_situacao
+                matricula=hist.matricula,
+                colaborador=hist.colaborador,
+                descr_secao=hist.descr_secao,
+                descr_situacao=hist.descr_situacao,
+                placas=hist.placas,
+                tipo_equipe=hist.tipo_equipe,
+                processo_equipe=hist.processo_equipe,
+                superv_campo=hist.superv_campo,
+                superv_operacao=hist.superv_operacao,
+                coordenador=hist.coordenador
             )
             
             db.add(registro)
@@ -198,8 +213,6 @@ def restaurar_historico(db, data_carga):
     except Exception as e:
         db.rollback()
         raise
-
-
 
 # ========================================
 # ROTAS PÚBLICAS (não precisa estar logado)
@@ -2143,6 +2156,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
