@@ -595,3 +595,71 @@ body {
     }
 }
 
+/* ==========================================
+   ESTILOS ADICIONAIS PARA SELEÇÃO MÚLTIPLA
+   Adicione isso no final do arquivo registro_v2.css
+========================================== */
+
+/* Contador de seleção */
+.contador-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #e0e0e0;
+    color: #666;
+    margin-left: 10px;
+    transition: all 0.3s;
+}
+
+.contador-badge.contador-parcial {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.contador-badge.contador-completo {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+    animation: pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Eletricistas selecionados */
+.eletricista-selecionado {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.eletricista-selecionado:last-child {
+    margin-bottom: 0;
+}
+
+.eletricista-selecionado strong {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.eletricista-selecionado small {
+    opacity: 0.9;
+    font-size: 13px;
+}
+
+/* Cards de eletricistas desabilitados */
+.eletricista-card {
+    transition: opacity 0.3s;
+}
+
+.eletricista-card input:disabled + label {
+    cursor: not-allowed;
+}
+
+
