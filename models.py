@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, Text, ForeignKey, TIMESTAMP, DateTime
 from sqlalchemy.sql import func
 from database import Base
-from datetime import datetime  # ← ADICIONE ESTA LINHA
+from datetime import datetime
 
 # ============================================
 # CLASSE: EstruturaEquipes (PRINCIPAL)
@@ -26,24 +26,21 @@ class EstruturaEquipes(Base):
     superv_operacao = Column(String(200))
     coordenador = Column(String(200))
 
-# ==========================================
-# HISTÓRICO DE ESTRUTURA DE EQUIPES
-# ==========================================
 
+# ============================================
+# CLASSE: EstruturaEquipesHistorico
+# Histórico de estrutura de equipes
+# ============================================
 class EstruturaEquipesHistorico(Base):
     __tablename__ = "estrutura_equipes_historico"
     
-    # ========================================
-    # CAMPOS DE CONTROLE DO HISTÓRICO
-    # ========================================
+    # Campos de controle do histórico
     id_historico = Column(Integer, primary_key=True, autoincrement=True)
-    data_carga = Column(DateTime, nullable=False, default=datetime.now)
+    data_carga = Column(DateTime, nullable=False)
     usuario_carga = Column(Integer)
     observacao = Column(String(500))
     
-    # ========================================
-    # CAMPOS DA ESTRUTURA ORIGINAL (TODOS!)
-    # ========================================
+    # Campos da estrutura original
     id_original = Column(Integer)
     regional = Column(String(100))
     polo = Column(String(100))
@@ -65,7 +62,7 @@ class EstruturaEquipesHistorico(Base):
 
 
 # ============================================
-# CLASSE 2: Usuario
+# CLASSE: Usuario
 # Representa a tabela USUARIOS
 # ============================================
 class Usuario(Base):
@@ -81,7 +78,7 @@ class Usuario(Base):
 
 
 # ============================================
-# CLASSE 3: MotivoIndisponibilidade
+# CLASSE: MotivoIndisponibilidade
 # Representa a tabela MOTIVOS_INDISPONIBILIDADE
 # ============================================
 class MotivoIndisponibilidade(Base):
@@ -93,7 +90,7 @@ class MotivoIndisponibilidade(Base):
 
 
 # ============================================
-# CLASSE 4: Indisponibilidade (ATUALIZADA)
+# CLASSE: Indisponibilidade
 # Representa a tabela INDISPONIBILIDADES
 # ============================================
 class Indisponibilidade(Base):
@@ -102,19 +99,18 @@ class Indisponibilidade(Base):
     id = Column(Integer, primary_key=True, index=True)
     data = Column(Date, nullable=False)
     eletricista_id = Column(Integer, ForeignKey('estrutura_equipes.id'))
-    eletricista2_id = Column(Integer, ForeignKey('estrutura_equipes.id'))  # ← NOVO!
+    eletricista2_id = Column(Integer, ForeignKey('estrutura_equipes.id'))
     matricula = Column(String)
     prefixo = Column(String, nullable=False)
-    tipo_indisponibilidade = Column(String)  # ← NOVO! 'parcial' ou 'total'
+    tipo_indisponibilidade = Column(String)  # 'parcial' ou 'total'
     motivo_id = Column(Integer, ForeignKey('motivos_indisponibilidade.id'))
     observacao = Column(Text)
     usuario_registro = Column(Integer, ForeignKey('usuarios.id'))
     criado_em = Column(TIMESTAMP, server_default=func.now())
-    # Campo 'tipo' foi REMOVIDO (estava obsoleto)
 
 
 # ============================================
-# CLASSE 5: EquipeDia (NOVA)
+# CLASSE: EquipeDia
 # Controle de frequência - equipes montadas por dia
 # ============================================
 class EquipeDia(Base):
@@ -125,13 +121,13 @@ class EquipeDia(Base):
     prefixo = Column(String, nullable=False)
     data = Column(Date, nullable=False)
     supervisor_registro = Column(String, nullable=False)
-    usuario_registro = Column(Integer, ForeignKey("usuarios.id"))  # ← ADICIONAR
+    usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
     criado_em = Column(DateTime, server_default=func.now())
     observacoes = Column(Text)
 
 
 # ============================================
-# CLASSE 6: Remanejamento (NOVA)
+# CLASSE: Remanejamento
 # Remanejamentos temporários de eletricistas
 # ============================================
 class Remanejamento(Base):
@@ -145,195 +141,14 @@ class Remanejamento(Base):
     temporario = Column(Boolean, default=True)
     usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
     criado_em = Column(DateTime, server_default=func.now())
-
     observacoes = Column(Text)
 
-# Função para criar todas as tabelas
+
+# ============================================
+# FUNÇÃO: Criar tabelas
+# ============================================
 def criar_tabelas():
     """Cria todas as tabelas no banco de dados"""
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
-
-# ==========================================
-# MODELO: Histórico de Estrutura de Equipes
-# ==========================================
-
-from sqlalchemy import Column, Integer, String, DateTime, Date
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
-
-Base = declarative_base()
-
-class EstruturaEquipesHistorico(Base):
-    __tablename__ = "estrutura_equipes_historico"
-    
-    # Chave primária própria do histórico
-    id_historico = Column(Integer, primary_key=True, autoincrement=True)
-    
-    # Campos de controle do histórico
-    data_carga = Column(DateTime, nullable=False, default=datetime.now)
-    usuario_carga = Column(String(100))
-    observacao = Column(String(500))  # Opcional: motivo da carga
-    
-    # Campos originais da estrutura_equipes (copiar TODOS os campos)
-    id_original = Column(Integer)  # ID do registro original
-    matricula = Column(String(20))
-    colaborador = Column(String(200))
-    polo = Column(String(100))
-    superv_campo = Column(String(200))
-    base = Column(String(100))
-    prefixo = Column(String(50))
-    descr_situacao = Column(String(50))
-    # ... adicionar TODOS os outros campos que existem em estrutura_equipes
-    
-    def __repr__(self):
-        return f"<Historico(data_carga={self.data_carga}, colaborador={self.colaborador})>"
-
-
-# ==========================================
-# FUNÇÃO: Arquivar estrutura atual
-# ==========================================
-
-def arquivar_estrutura_atual(db, usuario_id=None, observacao=None):
-    """
-    Copia toda a estrutura atual para o histórico antes de uma nova importação
-    """
-    from models import EstruturaEquipes  # Importar modelo atual
-    
-    try:
-        # Buscar todos os registros atuais
-        registros_atuais = db.query(EstruturaEquipes).all()
-        
-        if not registros_atuais:
-            print("⚠️ Nenhum registro para arquivar")
-            return 0
-        
-        # Copiar cada registro para o histórico
-        total_copiados = 0
-        data_carga_atual = datetime.now()
-        
-        for registro in registros_atuais:
-            historico = EstruturaEquipesHistorico(
-                data_carga=data_carga_atual,
-                usuario_carga=usuario_id,
-                observacao=observacao,
-                
-                # Copiar todos os campos do registro original
-                id_original=registro.id,
-                matricula=registro.matricula,
-                colaborador=registro.colaborador,
-                polo=registro.polo,
-                superv_campo=registro.superv_campo,
-                base=registro.base,
-                prefixo=registro.prefixo,
-                descr_situacao=registro.descr_situacao,
-                # ... copiar TODOS os outros campos
-            )
-            
-            db.add(historico)
-            total_copiados += 1
-        
-        db.commit()
-        
-        print(f"✅ {total_copiados} registros arquivados em {data_carga_atual}")
-        return total_copiados
-        
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Erro ao arquivar: {e}")
-        raise
-
-
-# ==========================================
-# FUNÇÃO: Restaurar de uma data específica
-# ==========================================
-
-def restaurar_historico(db, data_carga):
-    """
-    Restaura a estrutura de uma data específica do histórico
-    """
-    from models import EstruturaEquipes
-    
-    try:
-        # Buscar registros históricos da data
-        historicos = db.query(EstruturaEquipesHistorico).filter(
-            EstruturaEquipesHistorico.data_carga == data_carga
-        ).all()
-        
-        if not historicos:
-            print(f"⚠️ Nenhum histórico encontrado para {data_carga}")
-            return 0
-        
-        # Limpar estrutura atual
-        db.query(EstruturaEquipes).delete()
-        
-        # Restaurar registros do histórico
-        total_restaurados = 0
-        for hist in historicos:
-            registro = EstruturaEquipes(
-                matricula=hist.matricula,
-                colaborador=hist.colaborador,
-                polo=hist.polo,
-                superv_campo=hist.superv_campo,
-                base=hist.base,
-                prefixo=hist.prefixo,
-                descr_situacao=hist.descr_situacao,
-                # ... todos os outros campos
-            )
-            
-            db.add(registro)
-            total_restaurados += 1
-        
-        db.commit()
-        
-        print(f"✅ {total_restaurados} registros restaurados de {data_carga}")
-        return total_restaurados
-        
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Erro ao restaurar: {e}")
-        raise
-
-
-# ==========================================
-# FUNÇÃO: Listar datas de cargas disponíveis
-# ==========================================
-
-def listar_datas_historico(db):
-    """
-    Lista todas as datas de carga disponíveis no histórico
-    """
-    from sqlalchemy import func
-    
-    datas = db.query(
-        EstruturaEquipesHistorico.data_carga,
-        func.count(EstruturaEquipesHistorico.id_historico).label('total_registros'),
-        EstruturaEquipesHistorico.usuario_carga,
-        EstruturaEquipesHistorico.observacao
-    ).group_by(
-        EstruturaEquipesHistorico.data_carga,
-        EstruturaEquipesHistorico.usuario_carga,
-        EstruturaEquipesHistorico.observacao
-    ).order_by(
-        EstruturaEquipesHistorico.data_carga.desc()
-    ).all()
-    
-    return [
-        {
-            "data_carga": d[0].strftime('%d/%m/%Y %H:%M:%S'),
-            "total_registros": d[1],
-            "usuario": d[2] or "Sistema",
-            "observacao": d[3] or ""
-        }
-        for d in datas
-    ]
-
-
-
-
-
-
-
-
-
