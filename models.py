@@ -3,6 +3,29 @@ from sqlalchemy.sql import func
 from database import Base
 from datetime import datetime  # ← ADICIONE ESTA LINHA
 
+# ============================================
+# CLASSE: EstruturaEquipes (PRINCIPAL)
+# Representa a tabela de eletricistas
+# ============================================
+class EstruturaEquipes(Base):
+    __tablename__ = "estrutura_equipes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    regional = Column(String(100))
+    polo = Column(String(100))
+    base = Column(String(100))
+    prefixo = Column(String(50))
+    matricula = Column(String(20))
+    colaborador = Column(String(200))
+    descr_secao = Column(String(100))
+    descr_situacao = Column(String(50))
+    placas = Column(String(100))
+    tipo_equipe = Column(String(100))
+    processo_equipe = Column(String(100))
+    superv_campo = Column(String(200))
+    superv_operacao = Column(String(200))
+    coordenador = Column(String(200))
+
 # ==========================================
 # HISTÓRICO DE ESTRUTURA DE EQUIPES
 # ==========================================
@@ -305,6 +328,7 @@ def listar_datas_historico(db):
         }
         for d in datas
     ]
+
 
 
 
