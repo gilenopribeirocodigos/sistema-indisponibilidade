@@ -23,6 +23,7 @@
         <div class="tabs-container">
             <button class="tab-btn active" data-tab="geral">📋 Relatório Geral</button>
             <button class="tab-btn" data-tab="supervisor">👥 Por Supervisor</button>
+            <button class="tab-btn" data-tab="prefixo">🚗 Por Prefixo</button>
         </div>
 
         <!-- Filtros -->
@@ -150,6 +151,52 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             TAB 3: RELATÓRIO POR PREFIXO
+        ============================================ -->
+        <div id="tab-prefixo" class="tab-content">
+            <!-- Info do Relatório -->
+            <div id="relatorio-prefixo-info" class="relatorio-info" style="display: none;">
+                <h2>RELATÓRIO DE INDISPONIBILIDADE - POR PREFIXO</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Período:</strong> <span id="prefixo-periodo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Prefixos:</strong> <span id="prefixo-total-prefixos">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Registros:</strong> <span id="prefixo-total-registros">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="relatorio-tabela-container" id="container-tabela-prefixo" style="display: none;">
+                <table class="relatorio-tabela" id="tabela-prefixo">
+                    <thead>
+                        <tr>
+                            <th>Motivo</th>
+                            <th>Qtde</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-prefixo">
+                        <tr>
+                            <td colspan="3" class="loading">Gere um relatório para visualizar os dados</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total</strong></td>
+                            <td id="prefixo-total-qtde"><strong>-</strong></td>
+                            <td><strong>100,0%</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
         </div>
 
