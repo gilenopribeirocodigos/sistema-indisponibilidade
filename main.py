@@ -2025,6 +2025,147 @@ def relatorio_por_supervisor(
             "erro": str(e)
         })
 
+@app.get("/api/relatorio-por-prefixo")
+def relatorio_por_prefixo(
+    request: Request,
+    data_inicio: str = None,
+    data_fim: str = None,
+    db: Session = Depends(get_db)
+):
+    """API para gerar relatório POR PREFIXO - Modelo Vertical"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
+    from datetime import datetime, timedelta
+    
+    try:
+        # Definir período
+        if data_inicio and data_fim:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        elif data_inicio:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = data_inicio_obj
+        else:
+            data_inicio_obj = date.today()
+            data_fim_obj = date.today()
+        
+        # Criar lista de datas no período
+        dias_periodo = []
+        data_atual = data_inicio_obj
+        while data_atual <= data_fim_obj:
+            dias_periodo.append(data_atual)
+            data_atual += timedelta(days=1)
+        
+        # Total de prefixos únicos ATIVOS/RESERVA
+        total_prefixos = db.query(EstruturaEquipes.prefixo).filter(
+            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+        ).distinct().count()
+        
+        # Dicionário para contar PREFIXOS DISTINTOS por motivo
+        prefixos_por_motivo = {
+            "Presente": set(),
+            "Não registrado": set()
+        }
+        
+        # Para cada dia no período
+        for dia in dias_periodo:
+            # 1. PREFIXOS COM PRESENTES (frequência)
+            prefixos_presentes = db.query(EquipeDia.prefixo).filter(
+                EquipeDia.data == dia
+            ).distinct().all()
+            
+            for (prefixo,) in prefixos_presentes:
+                if prefixo:
+                    prefixos_por_motivo["Presente"].add(prefixo)
+            
+            # 2. PREFIXOS COM INDISPONÍVEIS por motivo
+            indisponiveis = db.query(
+                Indisponibilidade.prefixo,
+                MotivoIndisponibilidade.descricao
+            ).join(
+                MotivoIndisponibilidade,
+                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
+            ).filter(
+                Indisponibilidade.data == dia
+            ).distinct().all()
+            
+            prefixos_com_registro = set()
+            
+            for prefixo, motivo in indisponiveis:
+                if prefixo:
+                    prefixos_com_registro.add(prefixo)
+                    
+                    if motivo not in prefixos_por_motivo:
+                        prefixos_por_motivo[motivo] = set()
+                    prefixos_por_motivo[motivo].add(prefixo)
+            
+            # 3. PREFIXOS presentes também contam como "com registro"
+            for (prefixo,) in prefixos_presentes:
+                if prefixo:
+                    prefixos_com_registro.add(prefixo)
+            
+            # 4. PREFIXOS NÃO REGISTRADOS
+            todos_prefixos = db.query(EstruturaEquipes.prefixo).filter(
+                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+            ).distinct().all()
+            
+            for (prefixo,) in todos_prefixos:
+                if prefixo and prefixo not in prefixos_com_registro:
+                    prefixos_por_motivo["Não registrado"].add(prefixo)
+        
+        # Calcular total de registros (soma de todos os prefixos distintos que tiveram algum registro)
+        total_prefixos_com_registro = len(
+            set().union(*[v for v in prefixos_por_motivo.values()])
+        )
+        
+        # Preparar dados para resposta
+        dados_relatorio = []
+        for motivo, prefixos_set in prefixos_por_motivo.items():
+            qtde = len(prefixos_set)
+            percentual = (qtde / total_prefixos_com_registro * 100) if total_prefixos_com_registro > 0 else 0
+            
+            dados_relatorio.append({
+                "motivo": motivo,
+                "qtde": qtde,
+                "percentual": round(percentual, 1)
+            })
+        
+        # Ordenar: Presente primeiro, depois alfabético
+        dados_relatorio.sort(key=lambda x: (
+            0 if x['motivo'] == 'Presente' else 
+            2 if x['motivo'] == 'Não registrado' else 
+            1,
+            x['motivo']
+        ))
+        
+        return JSONResponse({
+            "success": True,
+            "periodo": {
+                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
+                "fim": data_fim_obj.strftime('%d/%m/%Y'),
+                "dias": len(dias_periodo)
+            },
+            "total_prefixos": total_prefixos,
+            "total_registros": total_prefixos_com_registro,
+            "dados": dados_relatorio
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
 # ==========================================
 # ROTA DE DEBUG - ADICIONE ISSO NO main.py
 # Copie todo este código e cole ANTES da linha "if __name__ == '__main__':"
@@ -2156,6 +2297,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
