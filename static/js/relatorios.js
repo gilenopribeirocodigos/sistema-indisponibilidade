@@ -57,8 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
     btnGerar.addEventListener('click', () => {
         if (tabAtual === 'geral') {
             gerarRelatorioGeral();
-        } else {
+        } else if (tabAtual === 'supervisor') {
             gerarRelatorioPorSupervisor();
+        } else if (tabAtual === 'prefixo') {
+            gerarRelatorioPorPrefixo();
         }
     });
     
@@ -367,6 +369,93 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             alert(`❌ Erro ao gerar relatório: ${error.message}`);
             console.error('Erro completo:', error);
+        }
+    }
+    
+    // ==========================================
+    // RELATÓRIO POR PREFIXO
+    // ==========================================
+    
+    async function gerarRelatorioPorPrefixo() {
+        try {
+            // Obter datas
+            let dataInicio, dataFim;
+            
+            if (tipoPeriodo.value === 'dia') {
+                dataInicio = document.getElementById('data-dia').value;
+                dataFim = dataInicio;
+            } else {
+                dataInicio = document.getElementById('data-inicio').value;
+                dataFim = document.getElementById('data-fim').value;
+            }
+            
+            if (!dataInicio || !dataFim) {
+                alert('⚠️ Selecione o período');
+                return;
+            }
+            
+            // Fazer requisição
+            const response = await fetch(
+                `/api/relatorio-por-prefixo?data_inicio=${dataInicio}&data_fim=${dataFim}`
+            );
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                alert(`❌ Erro: ${data.erro}`);
+                return;
+            }
+            
+            // Atualizar informações
+            document.getElementById('relatorio-prefixo-info').style.display = 'block';
+            document.getElementById('prefixo-periodo').textContent = 
+                `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
+            document.getElementById('prefixo-total-prefixos').textContent = data.total_prefixos;
+            document.getElementById('prefixo-total-registros').textContent = data.total_registros;
+            
+            // Renderizar tabela
+            const tbody = document.getElementById('tbody-prefixo');
+            tbody.innerHTML = '';
+            
+            data.dados.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                const tdMotivo = document.createElement('td');
+                tdMotivo.textContent = item.motivo;
+                
+                const tdQtde = document.createElement('td');
+                tdQtde.textContent = item.qtde;
+                
+                const tdPerc = document.createElement('td');
+                tdPerc.textContent = `${item.percentual}%`;
+                
+                // Cor no percentual
+                if (item.motivo === 'Presente') {
+                    tdPerc.classList.add('percentual-alta');
+                } else if (item.motivo === 'Não registrado') {
+                    tdPerc.classList.add('percentual-media');
+                }
+                
+                tr.appendChild(tdMotivo);
+                tr.appendChild(tdQtde);
+                tr.appendChild(tdPerc);
+                tbody.appendChild(tr);
+            });
+            
+            // Atualizar total
+            document.getElementById('prefixo-total-qtde').textContent = data.total_registros;
+            
+            // Mostrar tabela
+            document.getElementById('container-tabela-prefixo').style.display = 'block';
+            
+            // Atualizar data de geração
+            const agora = new Date();
+            document.getElementById('data-geracao').textContent = 
+                agora.toLocaleString('pt-BR');
+            
+        } catch (error) {
+            alert(`❌ Erro ao gerar relatório: ${error.message}`);
+            console.error(error);
         }
     }
 });
