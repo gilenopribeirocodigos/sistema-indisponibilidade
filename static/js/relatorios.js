@@ -380,27 +380,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Verificar se elementos existem
-            const elemPeriodo = document.getElementById('prefixo-periodo');
-            const elemTotalPrefixos = document.getElementById('prefixo-total-prefixos');
-            const elemTotalRegistros = document.getElementById('prefixo-total-registros');
+            // Atualizar informações (COM VERIFICAÇÃO)
+            const elemInfo = document.getElementById('relatorio-prefixo-info');
+            if (elemInfo) {
+                elemInfo.style.display = 'block';
+            }
             
+            const elemPeriodo = document.getElementById('prefixo-periodo');
             if (elemPeriodo) {
                 elemPeriodo.textContent = `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             }
             
+            const elemTotalPrefixos = document.getElementById('prefixo-total-prefixos');
             if (elemTotalPrefixos) {
                 elemTotalPrefixos.textContent = data.total_prefixos;
             }
             
+            const elemTotalRegistros = document.getElementById('prefixo-total-registros');
             if (elemTotalRegistros) {
                 elemTotalRegistros.textContent = data.total_registros;
-            }
-            
-            // Mostrar info
-            const elemInfo = document.getElementById('relatorio-prefixo-info');
-            if (elemInfo) {
-                elemInfo.style.display = 'block';
             }
             
             // Renderizar tabela
