@@ -210,44 +210,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Outro'
             ];
             
-            // DEBUG: Ver o que vem nos dados
-            console.log('Dados recebidos:', data.dados);
-            if (data.dados.length > 0) {
-                console.log('Contadores do primeiro supervisor:', data.dados[0].contadores);
-                console.log('Todas as chaves nos contadores:', Object.keys(data.dados[0].contadores));
-            }
-            
             // Função para remover acentos
             function removerAcentos(texto) {
                 return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             }
             
-            // Função para encontrar motivo nos contadores (ignora acentos e maiúsculas)
+            // Função para encontrar motivo nos contadores
             function buscarMotivo(contadores, motivoProcurado) {
-                // Tentar exato primeiro
                 if (contadores[motivoProcurado] !== undefined) {
                     return contadores[motivoProcurado];
                 }
                 
-                // Normalizar o motivo procurado (sem acentos, minúsculas)
                 const motivoNormalizado = removerAcentos(motivoProcurado.toLowerCase());
                 
-                // Procurar nos contadores
                 for (let chave in contadores) {
                     const chaveNormalizada = removerAcentos(chave.toLowerCase());
                     if (chaveNormalizada === motivoNormalizado) {
-                        console.log(`✅ Match encontrado: "${motivoProcurado}" = "${chave}"`);
                         return contadores[chave];
                     }
                 }
                 
-                console.log(`⚠️ Não encontrado: "${motivoProcurado}"`);
                 return 0;
             }
             
-            // ========================================
-            // RENDERIZAR DADOS
-            // ========================================
+            // Renderizar dados
             const tbody = document.querySelector('#tabela-supervisor tbody');
             tbody.innerHTML = '';
             
@@ -259,7 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             data.dados.forEach(sup => {
                 const tr = document.createElement('tr');
-                
                 const contadores = sup.contadores || {};
                 
                 // Supervisor
@@ -290,16 +275,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 tr.appendChild(tdTotalReg);
                 totalRegistros += totalReg;
                 
-                // === COLUNAS DE PERCENTUAL ===
-                
-                // % Presentes
+                // Percentuais
                 const percPresentes = totalReg > 0 ? ((qtdPresentes / totalReg) * 100).toFixed(1) : 0;
                 const tdPercPresentes = document.createElement('td');
                 tdPercPresentes.textContent = `${percPresentes}%`;
                 tdPercPresentes.classList.add('col-percentual');
                 tr.appendChild(tdPercPresentes);
                 
-                // % dos motivos
                 motivos.forEach(motivo => {
                     const qtd = buscarMotivo(contadores, motivo);
                     const perc = totalReg > 0 ? ((qtd / totalReg) * 100).toFixed(1) : 0;
@@ -312,42 +294,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.appendChild(tr);
             });
             
-            // Adicionar linha de TOTAL
+            // Linha de TOTAL
             const trTotal = document.createElement('tr');
             trTotal.classList.add('linha-total');
             
-            // Supervisor = TOTAL
             const tdTotalLabel = document.createElement('td');
             tdTotalLabel.innerHTML = '<strong>TOTAL</strong>';
             trTotal.appendChild(tdTotalLabel);
             
-            // Total Presentes
             const tdTotalPresentes = document.createElement('td');
             tdTotalPresentes.innerHTML = `<strong>${totalPresentes}</strong>`;
             trTotal.appendChild(tdTotalPresentes);
             
-            // Totais dos motivos
             motivos.forEach(motivo => {
                 const td = document.createElement('td');
                 td.innerHTML = `<strong>${totaisMotivos[motivo]}</strong>`;
                 trTotal.appendChild(td);
             });
             
-            // Total de registros
             const tdTotalGeral = document.createElement('td');
             tdTotalGeral.innerHTML = `<strong>${totalRegistros}</strong>`;
             trTotal.appendChild(tdTotalGeral);
             
-            // === PERCENTUAIS TOTAIS ===
-            
-            // % Presentes total
             const percPresentesTotal = totalRegistros > 0 ? ((totalPresentes / totalRegistros) * 100).toFixed(1) : 0;
             const tdPercPresentesTotal = document.createElement('td');
             tdPercPresentesTotal.innerHTML = `<strong>${percPresentesTotal}%</strong>`;
             tdPercPresentesTotal.classList.add('col-percentual');
             trTotal.appendChild(tdPercPresentesTotal);
             
-            // % dos motivos totais
             motivos.forEach(motivo => {
                 const perc = totalRegistros > 0 ? ((totaisMotivos[motivo] / totalRegistros) * 100).toFixed(1) : 0;
                 const td = document.createElement('td');
@@ -371,7 +345,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro completo:', error);
         }
     }
-    
     
     // ==========================================
     // RELATÓRIO POR PREFIXO
@@ -407,15 +380,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Atualizar informações
-            document.getElementById('relatorio-prefixo-info').style.display = 'block';
-            document.getElementById('prefixo-periodo').textContent = 
-                `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
-            document.getElementById('prefixo-total-prefixos').textContent = data.total_prefixos;
-            document.getElementById('prefixo-total-registros').textContent = data.total_registros;
+            // Verificar se elementos existem
+            const elemPeriodo = document.getElementById('prefixo-periodo');
+            const elemTotalPrefixos = document.getElementById('prefixo-total-prefixos');
+            const elemTotalRegistros = document.getElementById('prefixo-total-registros');
+            
+            if (elemPeriodo) {
+                elemPeriodo.textContent = `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
+            }
+            
+            if (elemTotalPrefixos) {
+                elemTotalPrefixos.textContent = data.total_prefixos;
+            }
+            
+            if (elemTotalRegistros) {
+                elemTotalRegistros.textContent = data.total_registros;
+            }
+            
+            // Mostrar info
+            const elemInfo = document.getElementById('relatorio-prefixo-info');
+            if (elemInfo) {
+                elemInfo.style.display = 'block';
+            }
             
             // Renderizar tabela
             const tbody = document.getElementById('tbody-prefixo');
+            if (!tbody) {
+                alert('❌ Erro: Tabela não encontrada');
+                return;
+            }
+            
             tbody.innerHTML = '';
             
             data.dados.forEach(item => {
@@ -430,7 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tdMotivo1 = document.createElement('td');
                 tdMotivo1.textContent = item.motivo1;
                 
-                // Cor no motivo 1
                 if (item.motivo1 === 'Presente') {
                     tdMotivo1.style.color = '#16a34a';
                     tdMotivo1.style.fontWeight = 'bold';
@@ -445,7 +438,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tdMotivo2 = document.createElement('td');
                 tdMotivo2.textContent = item.motivo2;
                 
-                // Cor no motivo 2
                 if (item.motivo2 === 'Presente') {
                     tdMotivo2.style.color = '#16a34a';
                     tdMotivo2.style.fontWeight = 'bold';
@@ -460,19 +452,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // Mostrar tabela
-            document.getElementById('container-tabela-prefixo').style.display = 'block';
+            const containerTabela = document.getElementById('container-tabela-prefixo');
+            if (containerTabela) {
+                containerTabela.style.display = 'block';
+            }
             
             // Atualizar data de geração
             const agora = new Date();
-            document.getElementById('data-geracao').textContent = 
-                agora.toLocaleString('pt-BR');
+            const elemDataGeracao = document.getElementById('data-geracao');
+            if (elemDataGeracao) {
+                elemDataGeracao.textContent = agora.toLocaleString('pt-BR');
+            }
             
         } catch (error) {
             alert(`❌ Erro ao gerar relatório: ${error.message}`);
-            console.error(error);
+            console.error('Erro completo:', error);
         }
     }
-
-
-    //FIM
 });
