@@ -2032,7 +2032,7 @@ def relatorio_por_prefixo(
     data_fim: str = None,
     db: Session = Depends(get_db)
 ):
-    """API para gerar relatório POR PREFIXO - Modelo Vertical"""
+    """API para gerar relatório POR PREFIXO - Mostra motivos de cada prefixo"""
     
     # Verificar autenticação
     if not verificar_autenticacao(request):
@@ -2044,6 +2044,7 @@ def relatorio_por_prefixo(
     
     from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
     from datetime import datetime, timedelta
+    from collections import Counter
     
     try:
         # Definir período
@@ -2064,16 +2065,14 @@ def relatorio_por_prefixo(
             dias_periodo.append(data_atual)
             data_atual += timedelta(days=1)
         
-        # Total de prefixos únicos ATIVOS/RESERVA
-        total_prefixos = db.query(EstruturaEquipes.prefixo).filter(
+        # Buscar todos os prefixos únicos ATIVOS/RESERVA
+        prefixos = db.query(EstruturaEquipes.prefixo).filter(
             EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-        ).distinct().count()
+        ).distinct().all()
+        prefixos = sorted([p[0] for p in prefixos if p[0]])
         
-        # Dicionário para contar PREFIXOS DISTINTOS por motivo
-        prefixos_por_motivo = {
-            "Presente": set(),
-            "Não registrado": set()
-        }
+        # Dicionário: prefixo -> lista de motivos
+        motivos_por_prefixo = {}
         
         # Para cada dia no período
         for dia in dias_periodo:
@@ -2084,9 +2083,11 @@ def relatorio_por_prefixo(
             
             for (prefixo,) in prefixos_presentes:
                 if prefixo:
-                    prefixos_por_motivo["Presente"].add(prefixo)
+                    if prefixo not in motivos_por_prefixo:
+                        motivos_por_prefixo[prefixo] = []
+                    motivos_por_prefixo[prefixo].append("Presente")
             
-            # 2. PREFIXOS COM INDISPONÍVEIS por motivo
+            # 2. PREFIXOS COM INDISPONÍVEIS
             indisponiveis = db.query(
                 Indisponibilidade.prefixo,
                 MotivoIndisponibilidade.descricao
@@ -2095,7 +2096,7 @@ def relatorio_por_prefixo(
                 Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
             ).filter(
                 Indisponibilidade.data == dia
-            ).distinct().all()
+            ).all()
             
             prefixos_com_registro = set()
             
@@ -2103,48 +2104,42 @@ def relatorio_por_prefixo(
                 if prefixo:
                     prefixos_com_registro.add(prefixo)
                     
-                    if motivo not in prefixos_por_motivo:
-                        prefixos_por_motivo[motivo] = set()
-                    prefixos_por_motivo[motivo].add(prefixo)
+                    if prefixo not in motivos_por_prefixo:
+                        motivos_por_prefixo[prefixo] = []
+                    motivos_por_prefixo[prefixo].append(motivo)
             
-            # 3. PREFIXOS presentes também contam como "com registro"
+            # 3. Prefixos presentes também contam como "com registro"
             for (prefixo,) in prefixos_presentes:
                 if prefixo:
                     prefixos_com_registro.add(prefixo)
             
             # 4. PREFIXOS NÃO REGISTRADOS
-            todos_prefixos = db.query(EstruturaEquipes.prefixo).filter(
-                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-            ).distinct().all()
-            
-            for (prefixo,) in todos_prefixos:
-                if prefixo and prefixo not in prefixos_com_registro:
-                    prefixos_por_motivo["Não registrado"].add(prefixo)
-        
-        # Calcular total de registros (soma de todos os prefixos distintos que tiveram algum registro)
-        total_prefixos_com_registro = len(
-            set().union(*[v for v in prefixos_por_motivo.values()])
-        )
+            for prefixo in prefixos:
+                if prefixo not in prefixos_com_registro:
+                    if prefixo not in motivos_por_prefixo:
+                        motivos_por_prefixo[prefixo] = []
+                    motivos_por_prefixo[prefixo].append("Não registrado")
         
         # Preparar dados para resposta
-        dados_relatorio = []
-        for motivo, prefixos_set in prefixos_por_motivo.items():
-            qtde = len(prefixos_set)
-            percentual = (qtde / total_prefixos_com_registro * 100) if total_prefixos_com_registro > 0 else 0
-            
-            dados_relatorio.append({
-                "motivo": motivo,
-                "qtde": qtde,
-                "percentual": round(percentual, 1)
-            })
+        dados_prefixos = []
         
-        # Ordenar: Presente primeiro, depois alfabético
-        dados_relatorio.sort(key=lambda x: (
-            0 if x['motivo'] == 'Presente' else 
-            2 if x['motivo'] == 'Não registrado' else 
-            1,
-            x['motivo']
-        ))
+        for prefixo in prefixos:
+            motivos = motivos_por_prefixo.get(prefixo, [])
+            
+            # Contar frequência de cada motivo
+            contador = Counter(motivos)
+            
+            # Pegar os 2 motivos mais frequentes
+            motivos_top = contador.most_common(2)
+            
+            motivo1 = motivos_top[0][0] if len(motivos_top) > 0 else "-"
+            motivo2 = motivos_top[1][0] if len(motivos_top) > 1 else "-"
+            
+            dados_prefixos.append({
+                "prefixo": prefixo,
+                "motivo1": motivo1,
+                "motivo2": motivo2
+            })
         
         return JSONResponse({
             "success": True,
@@ -2153,9 +2148,9 @@ def relatorio_por_prefixo(
                 "fim": data_fim_obj.strftime('%d/%m/%Y'),
                 "dias": len(dias_periodo)
             },
-            "total_prefixos": total_prefixos,
-            "total_registros": total_prefixos_com_registro,
-            "dados": dados_relatorio
+            "total_prefixos": len(prefixos),
+            "total_registros": len([p for p in dados_prefixos if p['motivo1'] != '-']),
+            "dados": dados_prefixos
         })
         
     except Exception as e:
@@ -2297,6 +2292,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
