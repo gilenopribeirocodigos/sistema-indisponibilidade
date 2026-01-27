@@ -372,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    
     // ==========================================
     // RELATÓRIO POR PREFIXO
     // ==========================================
@@ -420,30 +421,43 @@ document.addEventListener('DOMContentLoaded', () => {
             data.dados.forEach(item => {
                 const tr = document.createElement('tr');
                 
-                const tdMotivo = document.createElement('td');
-                tdMotivo.textContent = item.motivo;
+                // Prefixo
+                const tdPrefixo = document.createElement('td');
+                tdPrefixo.innerHTML = `<strong>${item.prefixo}</strong>`;
+                tr.appendChild(tdPrefixo);
                 
-                const tdQtde = document.createElement('td');
-                tdQtde.textContent = item.qtde;
+                // Motivo 1
+                const tdMotivo1 = document.createElement('td');
+                tdMotivo1.textContent = item.motivo1;
                 
-                const tdPerc = document.createElement('td');
-                tdPerc.textContent = `${item.percentual}%`;
-                
-                // Cor no percentual
-                if (item.motivo === 'Presente') {
-                    tdPerc.classList.add('percentual-alta');
-                } else if (item.motivo === 'Não registrado') {
-                    tdPerc.classList.add('percentual-media');
+                // Cor no motivo 1
+                if (item.motivo1 === 'Presente') {
+                    tdMotivo1.style.color = '#16a34a';
+                    tdMotivo1.style.fontWeight = 'bold';
+                } else if (item.motivo1 === 'Não registrado') {
+                    tdMotivo1.style.color = '#ca8a04';
+                    tdMotivo1.style.fontWeight = 'bold';
                 }
                 
-                tr.appendChild(tdMotivo);
-                tr.appendChild(tdQtde);
-                tr.appendChild(tdPerc);
+                tr.appendChild(tdMotivo1);
+                
+                // Motivo 2
+                const tdMotivo2 = document.createElement('td');
+                tdMotivo2.textContent = item.motivo2;
+                
+                // Cor no motivo 2
+                if (item.motivo2 === 'Presente') {
+                    tdMotivo2.style.color = '#16a34a';
+                    tdMotivo2.style.fontWeight = 'bold';
+                } else if (item.motivo2 === 'Não registrado') {
+                    tdMotivo2.style.color = '#ca8a04';
+                    tdMotivo2.style.fontWeight = 'bold';
+                }
+                
+                tr.appendChild(tdMotivo2);
+                
                 tbody.appendChild(tr);
             });
-            
-            // Atualizar total
-            document.getElementById('prefixo-total-qtde').textContent = data.total_registros;
             
             // Mostrar tabela
             document.getElementById('container-tabela-prefixo').style.display = 'block';
@@ -458,4 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(error);
         }
     }
+
+
+    //FIM
 });
