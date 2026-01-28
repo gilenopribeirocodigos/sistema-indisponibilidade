@@ -2071,15 +2071,16 @@ def relatorio_por_prefixo(
         ).distinct().all()
         prefixos = sorted([p[0] for p in prefixos if p[0]])
         
-        # Dicionário: prefixo -> lista de motivos
-        motivos_por_prefixo = {}
+        # Dicionário: prefixo -> {'motivos': [], 'primeira_data': date}
+        dados_por_prefixo = {}
         
         # Para cada dia no período
         for dia in dias_periodo:
-            # APENAS PREFIXOS COM INDISPONÍVEIS (ignora presentes)
+            # APENAS PREFIXOS COM INDISPONÍVEIS
             indisponiveis = db.query(
                 Indisponibilidade.prefixo,
-                MotivoIndisponibilidade.descricao
+                MotivoIndisponibilidade.descricao,
+                Indisponibilidade.data
             ).join(
                 MotivoIndisponibilidade,
                 Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
@@ -2087,19 +2088,30 @@ def relatorio_por_prefixo(
                 Indisponibilidade.data == dia
             ).all()
             
-            for prefixo, motivo in indisponiveis:
+            for prefixo, motivo, data in indisponiveis:
                 if prefixo:
-                    if prefixo not in motivos_por_prefixo:
-                        motivos_por_prefixo[prefixo] = []
-                    motivos_por_prefixo[prefixo].append(motivo)
+                    if prefixo not in dados_por_prefixo:
+                        dados_por_prefixo[prefixo] = {
+                            'motivos': [],
+                            'primeira_data': data
+                        }
+                    
+                    dados_por_prefixo[prefixo]['motivos'].append(motivo)
+                    
+                    # Atualizar primeira data se esta for anterior
+                    if data < dados_por_prefixo[prefixo]['primeira_data']:
+                        dados_por_prefixo[prefixo]['primeira_data'] = data
         
         # Total de prefixos ATIVOS
         total_prefixos_ativos = len(prefixos)
         
-        # Preparar dados para resposta (APENAS prefixos com indisponibilidade)
+        # Preparar dados para resposta
         dados_prefixos = []
         
-        for prefixo, motivos in motivos_por_prefixo.items():
+        for prefixo, dados in dados_por_prefixo.items():
+            motivos = dados['motivos']
+            primeira_data = dados['primeira_data']
+            
             # Contar frequência de cada motivo
             contador = Counter(motivos)
             
@@ -2111,6 +2123,7 @@ def relatorio_por_prefixo(
             
             dados_prefixos.append({
                 "prefixo": prefixo,
+                "data": primeira_data.strftime('%d/%m/%Y'),
                 "motivo1": motivo1,
                 "motivo2": motivo2
             })
@@ -2126,7 +2139,7 @@ def relatorio_por_prefixo(
                 "dias": len(dias_periodo)
             },
             "total_prefixos": total_prefixos_ativos,
-            "total_registros": len(dados_prefixos),  # Apenas prefixos com indisponibilidade
+            "total_registros": len(dados_prefixos),
             "dados": dados_prefixos
         })
         
@@ -2269,6 +2282,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
