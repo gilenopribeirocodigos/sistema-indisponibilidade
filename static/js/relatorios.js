@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`❌ Erro ao gerar relatório: ${error.message}`);
             console.error('Erro completo:', error);
         }
-    }
+    }    
     
     // ==========================================
     // RELATÓRIO POR PREFIXO
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('prefixo-periodo').textContent = 
                 `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             document.getElementById('prefixo-total-prefixos').textContent = data.total_prefixos;
-            document.getElementById('prefixo-total-registros').textContent = data.total_registros;            
+            document.getElementById('prefixo-total-registros').textContent = data.total_registros;
             
             // Renderizar tabela
             const tbody = document.getElementById('tbody-prefixo');
@@ -436,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 tbody.appendChild(tr);
             });
-
             
             // Mostrar tabela
             document.getElementById('container-tabela-prefixo').style.display = 'block';
@@ -451,4 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(error);
         }
     }
+
+    
 });
