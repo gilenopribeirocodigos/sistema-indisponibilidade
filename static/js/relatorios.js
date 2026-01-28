@@ -52,8 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // ==========================================
     // GERAR RELATÓRIO
-    // ==========================================
-    
+    // ==========================================  
+
     btnGerar.addEventListener('click', () => {
         if (tabAtual === 'geral') {
             gerarRelatorioGeral();
@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             gerarRelatorioPorSupervisor();
         } else if (tabAtual === 'prefixo') {
             gerarRelatorioPorPrefixo();
+        } else if (tabAtual === 'disponiveis') {
+            gerarRelatorioEletricistasDisponiveis();
         }
     });
     
@@ -450,6 +452,88 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(error);
         }
     }
+
+    // ==========================================
+    // RELATÓRIO ELETRICISTAS DISPONÍVEIS
+    // ==========================================
+    
+    async function gerarRelatorioEletricistasDisponiveis() {
+        try {
+            // Obter datas
+            let dataInicio, dataFim;
+            
+            if (tipoPeriodo.value === 'dia') {
+                dataInicio = document.getElementById('data-dia').value;
+                dataFim = dataInicio;
+            } else {
+                dataInicio = document.getElementById('data-inicio').value;
+                dataFim = document.getElementById('data-fim').value;
+            }
+            
+            if (!dataInicio || !dataFim) {
+                alert('⚠️ Selecione o período');
+                return;
+            }
+            
+            // Fazer requisição
+            const response = await fetch(
+                `/api/relatorio-eletricistas-disponiveis?data_inicio=${dataInicio}&data_fim=${dataFim}`
+            );
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                alert(`❌ Erro: ${data.erro}`);
+                return;
+            }
+            
+            // Atualizar informações
+            document.getElementById('relatorio-disponiveis-info').style.display = 'block';
+            document.getElementById('disponiveis-periodo').textContent = 
+                `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
+            document.getElementById('disponiveis-total-eletricistas').textContent = data.total_eletricistas;
+            document.getElementById('disponiveis-total-disponiveis').textContent = data.total_disponiveis;
+            
+            // Renderizar tabela
+            const tbody = document.getElementById('tbody-disponiveis');
+            tbody.innerHTML = '';
+            
+            if (data.dados.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="7" style="text-align: center; padding: 20px;">✅ Todos os eletricistas foram registrados no período!</td>';
+                tbody.appendChild(tr);
+            } else {
+                data.dados.forEach(item => {
+                    const tr = document.createElement('tr');
+                    
+                    tr.innerHTML = `
+                        <td>${item.polo}</td>
+                        <td>${item.base}</td>
+                        <td><strong>${item.matricula}</strong></td>
+                        <td>${item.colaborador}</td>
+                        <td>${item.processo_equipe}</td>
+                        <td>${item.superv_campo}</td>
+                        <td>${item.superv_operacao}</td>
+                    `;
+                    
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            // Mostrar tabela
+            document.getElementById('container-tabela-disponiveis').style.display = 'block';
+            
+            // Atualizar data de geração
+            const agora = new Date();
+            document.getElementById('data-geracao').textContent = 
+                agora.toLocaleString('pt-BR');
+            
+        } catch (error) {
+            alert(`❌ Erro ao gerar relatório: ${error.message}`);
+            console.error(error);
+        }
+    }
+
 
     
 });
