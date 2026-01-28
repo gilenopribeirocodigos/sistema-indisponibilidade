@@ -179,9 +179,9 @@
                 <table class="relatorio-tabela" id="tabela-prefixo">
                     <thead>
                         <tr>
-                            <th>Motivo</th>
-                            <th>Qtde</th>
-                            <th>%</th>
+                            <th>Prefixo</th>
+                            <th>Motivo 1</th>
+                            <th>Motivo 2</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-prefixo">
@@ -189,13 +189,6 @@
                             <td colspan="3" class="loading">Gere um relatório para visualizar os dados</td>
                         </tr>
                     </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td><strong>Total</strong></td>
-                            <td id="prefixo-total-qtde"><strong>-</strong></td>
-                            <td><strong>100,0%</strong></td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
         </div>
