@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('prefixo-periodo').textContent = 
                 `${data.periodo.inicio} até ${data.periodo.fim} (${data.periodo.dias} dia(s))`;
             document.getElementById('prefixo-total-prefixos').textContent = data.total_prefixos;
-            document.getElementById('prefixo-total-registros').textContent = data.total_registros;
+            document.getElementById('prefixo-total-registros').textContent = data.total_registros;            
             
             // Renderizar tabela
             const tbody = document.getElementById('tbody-prefixo');
@@ -398,6 +398,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tdPrefixo = document.createElement('td');
                 tdPrefixo.innerHTML = `<strong>${item.prefixo}</strong>`;
                 tr.appendChild(tdPrefixo);
+                
+                // Data
+                const tdData = document.createElement('td');
+                tdData.textContent = item.data;
+                tdData.style.fontWeight = 'bold';
+                tdData.style.color = '#6b7280';
+                tr.appendChild(tdData);
                 
                 // Motivo 1
                 const tdMotivo1 = document.createElement('td');
@@ -429,6 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 tbody.appendChild(tr);
             });
+
             
             // Mostrar tabela
             document.getElementById('container-tabela-prefixo').style.display = 'block';
