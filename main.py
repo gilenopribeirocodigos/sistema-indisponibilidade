@@ -2151,6 +2151,121 @@ def relatorio_por_prefixo(
             "erro": str(e)
         })
 
+@app.get("/api/relatorio-eletricistas-disponiveis")
+def relatorio_eletricistas_disponiveis(
+    request: Request,
+    data_inicio: str = None,
+    data_fim: str = None,
+    db: Session = Depends(get_db)
+):
+    """API para relatório de eletricistas DISPONÍVEIS (não registrados)"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EstruturaEquipes, EquipeDia, Indisponibilidade
+    from datetime import datetime, timedelta
+    
+    try:
+        # Definir período
+        if data_inicio and data_fim:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        elif data_inicio:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_obj = data_inicio_obj
+        else:
+            data_inicio_obj = date.today()
+            data_fim_obj = date.today()
+        
+        # Criar lista de datas no período
+        dias_periodo = []
+        data_atual = data_inicio_obj
+        while data_atual <= data_fim_obj:
+            dias_periodo.append(data_atual)
+            data_atual += timedelta(days=1)
+        
+        # Buscar TODOS os eletricistas ATIVOS/RESERVA
+        todos_eletricistas = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
+        ).all()
+        
+        # Conjunto de matrículas que NÃO tiveram NENHUM registro no período
+        matriculas_sem_registro = set()
+        
+        for eletricista in todos_eletricistas:
+            matricula = eletricista.matricula
+            tem_registro = False
+            
+            # Verificar se teve registro em ALGUM dia do período
+            for dia in dias_periodo:
+                # Verificar se está em equipe_dia (presentes)
+                presente = db.query(EquipeDia).filter(
+                    EquipeDia.matricula == matricula,
+                    EquipeDia.data == dia
+                ).first()
+                
+                if presente:
+                    tem_registro = True
+                    break
+                
+                # Verificar se está em indisponibilidade
+                indisponivel = db.query(Indisponibilidade).filter(
+                    Indisponibilidade.matricula == matricula,
+                    Indisponibilidade.data == dia
+                ).first()
+                
+                if indisponivel:
+                    tem_registro = True
+                    break
+            
+            # Se NÃO teve registro em nenhum dia, adiciona na lista
+            if not tem_registro:
+                matriculas_sem_registro.add(matricula)
+        
+        # Preparar dados para resposta
+        dados_disponiveis = []
+        
+        for eletricista in todos_eletricistas:
+            if eletricista.matricula in matriculas_sem_registro:
+                dados_disponiveis.append({
+                    "polo": eletricista.polo or "-",
+                    "base": eletricista.base or "-",
+                    "matricula": eletricista.matricula,
+                    "colaborador": eletricista.colaborador,
+                    "processo_equipe": eletricista.processo_equipe or "-",
+                    "superv_campo": eletricista.superv_campo or "-",
+                    "superv_operacao": eletricista.superv_operacao or "-"
+                })
+        
+        # Ordenar por polo, depois base, depois matrícula
+        dados_disponiveis.sort(key=lambda x: (x['polo'], x['base'], x['matricula']))
+        
+        return JSONResponse({
+            "success": True,
+            "periodo": {
+                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
+                "fim": data_fim_obj.strftime('%d/%m/%Y'),
+                "dias": len(dias_periodo)
+            },
+            "total_eletricistas": len(todos_eletricistas),
+            "total_disponiveis": len(dados_disponiveis),
+            "dados": dados_disponiveis
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
 # ==========================================
 # ROTA DE DEBUG - ADICIONE ISSO NO main.py
 # Copie todo este código e cole ANTES da linha "if __name__ == '__main__':"
@@ -2282,6 +2397,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
