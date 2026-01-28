@@ -192,7 +192,50 @@
                     </tbody>
                 </table>
             </div>
-
+        
+        <!-- ============================================
+             TAB 4: ELETRICISTAS DISPONÍVEIS
+        ============================================ -->
+        <div id="tab-disponiveis" class="tab-content">
+            <!-- Info do Relatório -->
+            <div id="relatorio-disponiveis-info" class="relatorio-info" style="display: none;">
+                <h2>RELATÓRIO DE ELETRICISTAS DISPONÍVEIS</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Período:</strong> <span id="disponiveis-periodo">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Eletricistas:</strong> <span id="disponiveis-total-eletricistas">-</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Total Disponíveis:</strong> <span id="disponiveis-total-disponiveis">-</span>
+                    </div>
+                </div>
+            </div>
+        
+            <!-- Tabela -->
+            <div class="relatorio-tabela-container" id="container-tabela-disponiveis" style="display: none;">
+                <table class="relatorio-tabela" id="tabela-disponiveis">
+                    <thead>
+                        <tr>
+                            <th>Polo</th>
+                            <th>Base</th>
+                            <th>Matrícula</th>
+                            <th>Colaborador</th>
+                            <th>Processo Equipe</th>
+                            <th>Superv Campo</th>
+                            <th>Superv Operação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-disponiveis">
+                        <tr>
+                            <td colspan="7" class="loading">Gere um relatório para visualizar os dados</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+            
         <!-- Footer -->
         <div class="footer-relatorio">
             <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
