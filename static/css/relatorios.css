@@ -1,5 +1,5 @@
 /* ==========================================
-   RELATÓRIOS - ESTILOS COMPLETO + MOBILE
+   RELATÓRIOS - MOBILE OTIMIZADO EXTREMO
 ========================================== */
 
 .relatorio-container {
@@ -391,205 +391,226 @@
 }
 
 /* ==========================================
-   RESPONSIVO - MOBILE OTIMIZADO
+   RESPONSIVO - MOBILE ULTRA COMPACTO
 ========================================== */
 
 @media (max-width: 768px) {
     .relatorio-container {
-        padding: 10px;
+        padding: 5px;
+        background: #fff;
     }
 
     .relatorio-header {
         flex-direction: column;
         text-align: center;
-        padding: 20px 15px;
+        padding: 15px 10px;
+        margin-bottom: 15px;
     }
     
     .relatorio-header h1 {
-        font-size: 20px;
+        font-size: 16px;
         width: 100%;
     }
     
     .btn-voltar {
         width: 100%;
         text-align: center;
+        padding: 8px;
+        font-size: 13px;
     }
 
     .user-info-mini {
         width: 100%;
         text-align: center;
-        font-size: 13px;
+        font-size: 11px;
     }
     
     /* Abas */
     .tabs-container {
         flex-direction: column;
-        padding: 8px;
+        padding: 5px;
+        gap: 5px;
     }
 
     .tab-btn {
         width: 100%;
-        font-size: 14px;
-        padding: 12px 15px;
+        font-size: 12px;
+        padding: 10px 8px;
     }
     
     /* Filtros */
     .filtros-section {
         flex-direction: column;
         align-items: stretch;
-        padding: 15px;
-        gap: 12px;
+        padding: 10px;
+        gap: 10px;
+        margin-bottom: 15px;
     }
     
     .filtro-grupo {
         width: 100%;
     }
 
+    .filtro-grupo label {
+        font-size: 11px;
+    }
+
     .filtro-grupo select,
     .filtro-grupo input[type="date"] {
         min-width: 100%;
         width: 100%;
+        padding: 8px 10px;
+        font-size: 13px;
     }
     
     .btn {
         width: 100%;
-        padding: 12px;
-        font-size: 15px;
+        padding: 10px;
+        font-size: 14px;
     }
 
     /* Info do Relatório */
     .relatorio-info {
-        padding: 15px;
+        padding: 10px;
+        margin-bottom: 15px;
     }
 
     .relatorio-info h2 {
-        font-size: 16px;
+        font-size: 13px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
     }
     
     .info-grid {
         grid-template-columns: 1fr;
-        gap: 10px;
+        gap: 8px;
     }
 
     .info-item {
-        padding: 12px;
+        padding: 10px;
     }
 
     .info-item strong {
-        font-size: 12px;
+        font-size: 10px;
     }
 
     .info-item span {
-        font-size: 16px;
+        font-size: 14px;
     }
 
-    /* Tabelas */
+    /* Tabelas - ULTRA COMPACTO */
     .relatorio-tabela-container {
-        padding: 10px;
+        padding: 5px;
         border-radius: 8px;
         position: relative;
+        margin-bottom: 15px;
     }
 
     /* Indicação de scroll */
     .relatorio-tabela-container::after {
-        content: "👈 Deslize para ver mais 👉";
+        content: "👈 Deslize 👉";
         display: block;
         text-align: center;
-        padding: 10px;
-        background: #f8f9fa;
-        color: #6c757d;
-        font-size: 12px;
-        font-style: italic;
+        padding: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 11px;
+        font-weight: bold;
         border-radius: 6px;
-        margin-top: 10px;
+        margin-top: 8px;
     }
 
+    /* Tabelas normais */
     .relatorio-tabela {
-        font-size: 11px;
+        font-size: 9px;
+        min-width: 500px;
     }
 
     .relatorio-tabela th,
     .relatorio-tabela td {
-        padding: 8px 6px;
-        font-size: 11px;
+        padding: 5px 3px;
+        font-size: 9px;
+        line-height: 1.2;
     }
 
     .relatorio-tabela th {
-        font-size: 10px;
+        font-size: 8px;
+        padding: 6px 3px;
     }
 
-    /* Tabela Wide no mobile */
-    .tabela-wide th,
-    .tabela-wide td {
-        padding: 6px 3px !important;
-        font-size: 9px !important;
-    }
-
-    .tabela-wide tbody td:first-child {
-        font-size: 9px !important;
-        min-width: 50px;
-    }
-
-    /* Footer */
-    .footer-relatorio {
-        font-size: 11px;
-        padding: 15px 10px;
-    }
-}
-
-@media (max-width: 480px) {
-    .relatorio-container {
-        padding: 5px;
-    }
-
-    .relatorio-header {
-        padding: 15px 10px;
-        margin-bottom: 15px;
-    }
-
-    .relatorio-header h1 {
-        font-size: 16px;
-    }
-
-    .tab-btn {
-        font-size: 13px;
-        padding: 10px 12px;
-    }
-
-    .filtros-section {
-        padding: 12px;
-    }
-
-    .filtro-grupo label {
-        font-size: 12px;
-    }
-
-    .relatorio-info h2 {
-        font-size: 14px;
-    }
-
-    .info-item span {
-        font-size: 14px;
-    }
-
-    .relatorio-tabela-container {
-        padding: 8px;
-    }
-
-    .relatorio-tabela th,
-    .relatorio-tabela td {
-        padding: 6px 4px;
-        font-size: 10px;
+    /* TABELA WIDE - SUPERVISOR - ULTRA COMPACTO */
+    .tabela-wide {
+        min-width: 800px !important;
     }
 
     .tabela-wide th,
     .tabela-wide td {
         padding: 4px 2px !important;
-        font-size: 8px !important;
+        font-size: 7px !important;
+        min-width: 32px !important;
+        line-height: 1.1 !important;
     }
 
+    .tabela-wide th {
+        font-size: 6.5px !important;
+        padding: 5px 2px !important;
+        word-break: break-word;
+    }
+
+    .tabela-wide tbody td:first-child {
+        font-size: 8px !important;
+        min-width: 60px !important;
+        padding: 4px 3px !important;
+        text-align: left !important;
+    }
+
+    /* Linha de total na tabela wide */
+    .linha-total td {
+        font-size: 7px !important;
+        font-weight: bold !important;
+    }
+
+    /* Footer */
     .footer-relatorio {
-        font-size: 10px;
+        font-size: 9px;
+        padding: 10px 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .relatorio-header h1 {
+        font-size: 14px;
+    }
+
+    .tab-btn {
+        font-size: 11px;
+        padding: 8px 6px;
+    }
+
+    .relatorio-info h2 {
+        font-size: 12px;
+    }
+
+    .info-item span {
+        font-size: 13px;
+    }
+
+    /* TABELA WIDE - AINDA MAIS COMPACTO */
+    .tabela-wide th,
+    .tabela-wide td {
+        padding: 3px 1px !important;
+        font-size: 6.5px !important;
+        min-width: 28px !important;
+    }
+
+    .tabela-wide th {
+        font-size: 6px !important;
+        padding: 4px 1px !important;
+    }
+
+    .tabela-wide tbody td:first-child {
+        font-size: 7px !important;
+        min-width: 50px !important;
     }
 }
 
