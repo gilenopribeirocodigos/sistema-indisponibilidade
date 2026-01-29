@@ -2195,44 +2195,41 @@ def relatorio_eletricistas_disponiveis(
             EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
         ).all()
         
-        # Conjunto de matrículas que NÃO tiveram NENHUM registro no período
-        matriculas_sem_registro = set()
+        # Dicionário: id_eletricista -> set de datas com registro
+        eletricistas_com_registro = {}
         
-        for eletricista in todos_eletricistas:
-            matricula = eletricista.matricula
-            tem_registro = False
+        # Para cada dia no período
+        for dia in dias_periodo:
+            # Buscar todos os IDs de eletricistas que tiveram registro neste dia
             
-            # Verificar se teve registro em ALGUM dia do período
-            for dia in dias_periodo:
-                # Verificar se está em equipe_dia (presentes)
-                presente = db.query(EquipeDia).filter(
-                    EquipeDia.matricula == matricula,
-                    EquipeDia.data == dia
-                ).first()
-                
-                if presente:
-                    tem_registro = True
-                    break
-                
-                # Verificar se está em indisponibilidade
-                indisponivel = db.query(Indisponibilidade).filter(
-                    Indisponibilidade.matricula == matricula,
-                    Indisponibilidade.data == dia
-                ).first()
-                
-                if indisponivel:
-                    tem_registro = True
-                    break
+            # 1. IDs em equipe_dia (presentes)
+            presentes = db.query(EquipeDia.eletricista_id).filter(
+                EquipeDia.data == dia
+            ).distinct().all()
             
-            # Se NÃO teve registro em nenhum dia, adiciona na lista
-            if not tem_registro:
-                matriculas_sem_registro.add(matricula)
+            for (eletricista_id,) in presentes:
+                if eletricista_id:
+                    if eletricista_id not in eletricistas_com_registro:
+                        eletricistas_com_registro[eletricista_id] = set()
+                    eletricistas_com_registro[eletricista_id].add(dia)
+            
+            # 2. IDs em indisponibilidade
+            indisponiveis = db.query(Indisponibilidade.eletricista_id).filter(
+                Indisponibilidade.data == dia
+            ).distinct().all()
+            
+            for (eletricista_id,) in indisponiveis:
+                if eletricista_id:
+                    if eletricista_id not in eletricistas_com_registro:
+                        eletricistas_com_registro[eletricista_id] = set()
+                    eletricistas_com_registro[eletricista_id].add(dia)
         
-        # Preparar dados para resposta
+        # Preparar dados para resposta (apenas eletricistas SEM NENHUM registro)
         dados_disponiveis = []
         
         for eletricista in todos_eletricistas:
-            if eletricista.matricula in matriculas_sem_registro:
+            # Se o eletricista NÃO teve nenhum registro em nenhum dia do período
+            if eletricista.id not in eletricistas_com_registro:
                 dados_disponiveis.append({
                     "polo": eletricista.polo or "-",
                     "base": eletricista.base or "-",
@@ -2397,6 +2394,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
