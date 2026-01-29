@@ -1,5 +1,5 @@
 /* ==========================================
-   RELATÓRIOS - ESTILOS
+   RELATÓRIOS - ESTILOS COMPLETO + MOBILE
 ========================================== */
 
 .relatorio-container {
@@ -193,6 +193,7 @@
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .relatorio-tabela {
@@ -389,40 +390,229 @@
     color: white;
 }
 
-/* Responsivo */
+/* ==========================================
+   RESPONSIVO - MOBILE OTIMIZADO
+========================================== */
+
 @media (max-width: 768px) {
+    .relatorio-container {
+        padding: 10px;
+    }
+
     .relatorio-header {
         flex-direction: column;
         text-align: center;
+        padding: 20px 15px;
     }
     
     .relatorio-header h1 {
-        font-size: 22px;
+        font-size: 20px;
+        width: 100%;
     }
     
     .btn-voltar {
         width: 100%;
+        text-align: center;
+    }
+
+    .user-info-mini {
+        width: 100%;
+        text-align: center;
+        font-size: 13px;
     }
     
+    /* Abas */
     .tabs-container {
         flex-direction: column;
+        padding: 8px;
+    }
+
+    .tab-btn {
+        width: 100%;
+        font-size: 14px;
+        padding: 12px 15px;
     }
     
+    /* Filtros */
     .filtros-section {
         flex-direction: column;
         align-items: stretch;
+        padding: 15px;
+        gap: 12px;
     }
     
+    .filtro-grupo {
+        width: 100%;
+    }
+
     .filtro-grupo select,
     .filtro-grupo input[type="date"] {
         min-width: 100%;
+        width: 100%;
     }
     
     .btn {
         width: 100%;
+        padding: 12px;
+        font-size: 15px;
+    }
+
+    /* Info do Relatório */
+    .relatorio-info {
+        padding: 15px;
+    }
+
+    .relatorio-info h2 {
+        font-size: 16px;
     }
     
     .info-grid {
         grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .info-item {
+        padding: 12px;
+    }
+
+    .info-item strong {
+        font-size: 12px;
+    }
+
+    .info-item span {
+        font-size: 16px;
+    }
+
+    /* Tabelas */
+    .relatorio-tabela-container {
+        padding: 10px;
+        border-radius: 8px;
+        position: relative;
+    }
+
+    /* Indicação de scroll */
+    .relatorio-tabela-container::after {
+        content: "👈 Deslize para ver mais 👉";
+        display: block;
+        text-align: center;
+        padding: 10px;
+        background: #f8f9fa;
+        color: #6c757d;
+        font-size: 12px;
+        font-style: italic;
+        border-radius: 6px;
+        margin-top: 10px;
+    }
+
+    .relatorio-tabela {
+        font-size: 11px;
+    }
+
+    .relatorio-tabela th,
+    .relatorio-tabela td {
+        padding: 8px 6px;
+        font-size: 11px;
+    }
+
+    .relatorio-tabela th {
+        font-size: 10px;
+    }
+
+    /* Tabela Wide no mobile */
+    .tabela-wide th,
+    .tabela-wide td {
+        padding: 6px 3px !important;
+        font-size: 9px !important;
+    }
+
+    .tabela-wide tbody td:first-child {
+        font-size: 9px !important;
+        min-width: 50px;
+    }
+
+    /* Footer */
+    .footer-relatorio {
+        font-size: 11px;
+        padding: 15px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .relatorio-container {
+        padding: 5px;
+    }
+
+    .relatorio-header {
+        padding: 15px 10px;
+        margin-bottom: 15px;
+    }
+
+    .relatorio-header h1 {
+        font-size: 16px;
+    }
+
+    .tab-btn {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+
+    .filtros-section {
+        padding: 12px;
+    }
+
+    .filtro-grupo label {
+        font-size: 12px;
+    }
+
+    .relatorio-info h2 {
+        font-size: 14px;
+    }
+
+    .info-item span {
+        font-size: 14px;
+    }
+
+    .relatorio-tabela-container {
+        padding: 8px;
+    }
+
+    .relatorio-tabela th,
+    .relatorio-tabela td {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+
+    .tabela-wide th,
+    .tabela-wide td {
+        padding: 4px 2px !important;
+        font-size: 8px !important;
+    }
+
+    .footer-relatorio {
+        font-size: 10px;
+    }
+}
+
+/* Tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .relatorio-container {
+        padding: 15px;
+    }
+
+    .relatorio-header h1 {
+        font-size: 24px;
+    }
+
+    .tabs-container {
+        gap: 8px;
+    }
+
+    .tab-btn {
+        font-size: 14px;
+        padding: 12px 15px;
+    }
+
+    .filtros-section {
+        gap: 15px;
     }
 }
