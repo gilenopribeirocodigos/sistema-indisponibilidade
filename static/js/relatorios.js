@@ -124,9 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 tdPerc.textContent = `${item.percentual}%`;
                 
                 // Cor no percentual
-                if (item.motivo === 'Presente') {
+                if (item.motivo === 'PRESENTE') {
                     tdPerc.classList.add('percentual-alta');
-                } else if (item.motivo === 'Não registrado') {
+                } else if (item.motivo === 'NÃO REGISTRADO') {
                     tdPerc.classList.add('percentual-media');
                 }
                 
