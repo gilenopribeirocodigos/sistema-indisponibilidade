@@ -1737,8 +1737,8 @@ def relatorio_geral(
         
         # Dicionário para contar
         resultado = {
-            "Presente": 0,
-            "Não registrado": 0
+            "PRESENTE": 0,
+            "NÃO REGISTRADO": 0
         }
         
         # Para cada dia no período
@@ -1749,7 +1749,7 @@ def relatorio_geral(
             ).all()
             ids_presentes = set([p[0] for p in ids_presentes])
             
-            resultado["Presente"] += len(ids_presentes)
+            resultado["PRESENTE"] += len(ids_presentes)
             
             # 2. INDISPONÍVEIS com motivo
             indisponiveis = db.query(
@@ -1764,11 +1764,12 @@ def relatorio_geral(
             
             ids_indisponiveis = set([i[0] for i in indisponiveis])
             
-            # Contar por motivo
+            # Contar por motivo (em MAIÚSCULAS)
             for elet_id, motivo in indisponiveis:
-                if motivo not in resultado:
-                    resultado[motivo] = 0
-                resultado[motivo] += 1
+                motivo_upper = motivo.upper()
+                if motivo_upper not in resultado:
+                    resultado[motivo_upper] = 0
+                resultado[motivo_upper] += 1
             
             # 3. NÃO REGISTRADOS
             ids_registrados = ids_presentes.union(ids_indisponiveis)
@@ -1778,25 +1779,27 @@ def relatorio_geral(
                 ~EstruturaEquipes.id.in_(list(ids_registrados))
             ).count()
             
-            resultado["Não registrado"] += total_nao_registrados
+            resultado["NÃO REGISTRADO"] += total_nao_registrados
         
-        # Calcular total de registros
-        total_registros = sum(resultado.values())
+        # ✅ AJUSTE: Total de registros SEM os "Não registrado"
+        total_registros = sum(v for k, v in resultado.items() if k != "NÃO REGISTRADO")
         
-        # Calcular percentuais
+        # Calcular percentuais (sobre TODOS, incluindo não registrado)
+        total_geral = sum(resultado.values())
+        
         dados_relatorio = []
         for motivo, qtde in resultado.items():
-            percentual = (qtde / total_registros * 100) if total_registros > 0 else 0
+            percentual = (qtde / total_geral * 100) if total_geral > 0 else 0
             dados_relatorio.append({
                 "motivo": motivo,
                 "qtde": qtde,
                 "percentual": round(percentual, 1)
             })
         
-        # Ordenar: Presente primeiro, depois alfabético
+        # Ordenar: PRESENTE primeiro, depois alfabético, NÃO REGISTRADO por último
         dados_relatorio.sort(key=lambda x: (
-            0 if x['motivo'] == 'Presente' else 
-            2 if x['motivo'] == 'Não registrado' else 
+            0 if x['motivo'] == 'PRESENTE' else 
+            2 if x['motivo'] == 'NÃO REGISTRADO' else 
             1,
             x['motivo']
         ))
@@ -1809,7 +1812,7 @@ def relatorio_geral(
                 "dias": len(dias_periodo)
             },
             "total_eletricistas": total_eletricistas,
-            "total_registros": total_registros,
+            "total_registros": total_registros,  # ✅ SEM os "Não registrado"
             "dados": dados_relatorio
         })
         
@@ -2394,6 +2397,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
