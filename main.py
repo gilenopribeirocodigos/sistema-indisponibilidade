@@ -2035,9 +2035,8 @@ def relatorio_por_prefixo(
     data_fim: str = None,
     db: Session = Depends(get_db)
 ):
-    """API para gerar relatório POR PREFIXO - Mostra motivos de cada prefixo"""
+    """API para gerar relatório POR PREFIXO - Mostra motivo principal e quantidade"""
     
-    # Verificar autenticação
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
     
@@ -2045,7 +2044,7 @@ def relatorio_por_prefixo(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
+    from models import EstruturaEquipes, Indisponibilidade, MotivoIndisponibilidade
     from datetime import datetime, timedelta
     from collections import Counter
     
@@ -2079,7 +2078,6 @@ def relatorio_por_prefixo(
         
         # Para cada dia no período
         for dia in dias_periodo:
-            # APENAS PREFIXOS COM INDISPONÍVEIS
             indisponiveis = db.query(
                 Indisponibilidade.prefixo,
                 MotivoIndisponibilidade.descricao,
@@ -2101,11 +2099,9 @@ def relatorio_por_prefixo(
                     
                     dados_por_prefixo[prefixo]['motivos'].append(motivo)
                     
-                    # Atualizar primeira data se esta for anterior
                     if data < dados_por_prefixo[prefixo]['primeira_data']:
                         dados_por_prefixo[prefixo]['primeira_data'] = data
         
-        # Total de prefixos ATIVOS
         total_prefixos_ativos = len(prefixos)
         
         # Preparar dados para resposta
@@ -2118,11 +2114,19 @@ def relatorio_por_prefixo(
             # Contar frequência de cada motivo
             contador = Counter(motivos)
             
-            # Pegar os 2 motivos mais frequentes
+            # Pegar os 2 motivos mais frequentes (COM QUANTIDADE)
             motivos_top = contador.most_common(2)
             
-            motivo1 = motivos_top[0][0] if len(motivos_top) > 0 else "-"
-            motivo2 = motivos_top[1][0] if len(motivos_top) > 1 else "-"
+            # ✅ NOVO: Mostrar motivo E quantidade
+            if len(motivos_top) > 0:
+                motivo1 = f"{motivos_top[0][0]} ({motivos_top[0][1]})"
+            else:
+                motivo1 = "-"
+            
+            if len(motivos_top) > 1:
+                motivo2 = f"{motivos_top[1][0]} ({motivos_top[1][1]})"
+            else:
+                motivo2 = "-"
             
             dados_prefixos.append({
                 "prefixo": prefixo,
@@ -2397,6 +2401,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
