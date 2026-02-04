@@ -2035,7 +2035,7 @@ def relatorio_por_prefixo(
     data_fim: str = None,
     db: Session = Depends(get_db)
 ):
-    """API para gerar relatório POR PREFIXO - Mostra motivo principal e quantidade"""
+    """API para gerar relatório POR PREFIXO - Mostra até 2 motivos diferentes"""
     
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
@@ -2044,9 +2044,8 @@ def relatorio_por_prefixo(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import EstruturaEquipes, Indisponibilidade, MotivoIndisponibilidade
+    from models import Indisponibilidade, MotivoIndisponibilidade
     from datetime import datetime, timedelta
-    from collections import Counter
     
     try:
         # Definir período
@@ -2067,76 +2066,56 @@ def relatorio_por_prefixo(
             dias_periodo.append(data_atual)
             data_atual += timedelta(days=1)
         
-        # Buscar todos os prefixos únicos ATIVOS/RESERVA
-        prefixos = db.query(EstruturaEquipes.prefixo).filter(
-            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-        ).distinct().all()
-        prefixos = sorted([p[0] for p in prefixos if p[0]])
-        
-        # Dicionário: prefixo -> {'motivos': [], 'primeira_data': date}
+        # Dicionário: (prefixo, data) -> [lista de motivos]
         dados_por_prefixo = {}
         
-        # Para cada dia no período
+        # Buscar TODAS as indisponibilidades do período
         for dia in dias_periodo:
             indisponiveis = db.query(
                 Indisponibilidade.prefixo,
                 MotivoIndisponibilidade.descricao,
-                Indisponibilidade.data
+                Indisponibilidade.data,
+                Indisponibilidade.eletricista_id
             ).join(
                 MotivoIndisponibilidade,
                 Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
             ).filter(
                 Indisponibilidade.data == dia
+            ).order_by(
+                Indisponibilidade.prefixo,
+                Indisponibilidade.id  # Ordenar por ID para manter ordem de registro
             ).all()
             
-            for prefixo, motivo, data in indisponiveis:
+            for prefixo, motivo, data, elet_id in indisponiveis:
                 if prefixo:
-                    if prefixo not in dados_por_prefixo:
-                        dados_por_prefixo[prefixo] = {
-                            'motivos': [],
-                            'primeira_data': data
-                        }
+                    chave = (prefixo, data)
                     
-                    dados_por_prefixo[prefixo]['motivos'].append(motivo)
+                    if chave not in dados_por_prefixo:
+                        dados_por_prefixo[chave] = []
                     
-                    if data < dados_por_prefixo[prefixo]['primeira_data']:
-                        dados_por_prefixo[prefixo]['primeira_data'] = data
-        
-        total_prefixos_ativos = len(prefixos)
+                    # Adicionar motivo (máximo 2 por prefixo/data)
+                    if len(dados_por_prefixo[chave]) < 2:
+                        dados_por_prefixo[chave].append(motivo)
         
         # Preparar dados para resposta
         dados_prefixos = []
         
-        for prefixo, dados in dados_por_prefixo.items():
-            motivos = dados['motivos']
-            primeira_data = dados['primeira_data']
-            
-            # Contar frequência de cada motivo
-            contador = Counter(motivos)
-            
-            # Pegar os 2 motivos mais frequentes (COM QUANTIDADE)
-            motivos_top = contador.most_common(2)
-            
-            # ✅ NOVO: Mostrar motivo E quantidade
-            if len(motivos_top) > 0:
-                motivo1 = f"{motivos_top[0][0]} ({motivos_top[0][1]})"
-            else:
-                motivo1 = "-"
-            
-            if len(motivos_top) > 1:
-                motivo2 = f"{motivos_top[1][0]} ({motivos_top[1][1]})"
-            else:
-                motivo2 = "-"
+        for (prefixo, data), motivos in dados_por_prefixo.items():
+            motivo1 = motivos[0] if len(motivos) > 0 else "-"
+            motivo2 = motivos[1] if len(motivos) > 1 else "-"
             
             dados_prefixos.append({
                 "prefixo": prefixo,
-                "data": primeira_data.strftime('%d/%m/%Y'),
+                "data": data.strftime('%d/%m/%Y'),
                 "motivo1": motivo1,
                 "motivo2": motivo2
             })
         
         # Ordenar por prefixo
-        dados_prefixos.sort(key=lambda x: x['prefixo'])
+        dados_prefixos.sort(key=lambda x: (x['prefixo'], x['data']))
+        
+        # Total de prefixos únicos
+        prefixos_unicos = set([d['prefixo'] for d in dados_prefixos])
         
         return JSONResponse({
             "success": True,
@@ -2145,7 +2124,7 @@ def relatorio_por_prefixo(
                 "fim": data_fim_obj.strftime('%d/%m/%Y'),
                 "dias": len(dias_periodo)
             },
-            "total_prefixos": total_prefixos_ativos,
+            "total_prefixos": len(prefixos_unicos),
             "total_registros": len(dados_prefixos),
             "dados": dados_prefixos
         })
@@ -2401,6 +2380,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
