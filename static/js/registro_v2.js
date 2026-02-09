@@ -226,10 +226,8 @@ class RegistroV2 {
                         // ✅ ESCONDER PAINEL DE PENDENTES
                         document.getElementById('associacoes-temporarias').style.display = 'none';
                         
-                        // ✅ MOSTRAR TODOS OS CARDS NOVAMENTE
-                        document.querySelectorAll('.eletricista-card').forEach(card => {
-                            card.style.display = 'block';
-                        });
+                        // ✅ NÃO MOSTRAR OS CARDS NOVAMENTE!
+                        // Os eletricistas salvos ficam ocultos para não serem registrados novamente
                         
                     } else {
                         alert(`❌ Erro: ${result.erro}`);
@@ -301,8 +299,7 @@ class RegistroV2 {
         });
     }
     
-    
-    // ✅ NOVA FUNÇÃO: MOSTRAR REGISTROS SALVOS (ACUMULAR)
+    // ✅ FUNÇÃO CORRIGIDA: MOSTRAR REGISTROS SALVOS (ACUMULAR)
     mostrarRegistrosSalvos(associacoes, dataSalva) {
         const container = document.getElementById('registros-salvos');
         const lista = document.getElementById('lista-salvos');
@@ -367,9 +364,6 @@ class RegistroV2 {
         // ✅ ADICIONAR O NOVO BLOCO AO FINAL (não substituir!)
         lista.innerHTML += novoBloco;
         
-        // ✅ Atualizar contador total
-        const totalElementos = lista.querySelectorAll('strong').length - 1; // -1 do cabeçalho
-        
         // Scroll suave até a seção
         setTimeout(() => {
             container.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -401,17 +395,11 @@ class RegistroV2 {
                     // Pegar data selecionada
                     const dataRegistro = document.getElementById('data-registro').value;
                     
-                    // DEBUG
                     const apiUrl = `/api/buscar-eletricistas-remanejar?q=${encodeURIComponent(termo)}&data=${dataRegistro}`;
-                    console.log('🔍 [REMANEJAR] Buscando em:', apiUrl);
-                    console.log('📊 [REMANEJAR] Data:', dataRegistro);
                     
                     const response = await fetch(apiUrl);
                     const data = await response.json();
                     
-                    console.log('✅ [REMANEJAR] Total de resultados:', data.eletricistas.length);
-                    
-                    // ✅ MOSTRAR RESULTADOS DIRETAMENTE (SEM CHAMAR FUNÇÃO SEPARADA)
                     if (data.eletricistas.length === 0) {
                         resultadoDiv.innerHTML = '<p style="color: #999;">Nenhum eletricista encontrado</p>';
                     } else {
@@ -659,4 +647,3 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
-
