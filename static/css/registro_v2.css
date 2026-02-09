@@ -662,4 +662,38 @@ body {
     cursor: not-allowed;
 }
 
+/* ==========================================
+   REGISTROS SALVOS
+========================================== */
+
+#registros-salvos {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+    border: 2px solid #28a745;
+}
+
+#registros-salvos h4 {
+    margin: 0 0 20px 0;
+    font-size: 20px;
+}
+
+#lista-salvos {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+#btn-continuar-registrando {
+    min-width: 250px;
+    font-size: 16px;
+    padding: 12px 24px;
+}
+
+#btn-continuar-registrando:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+
 
