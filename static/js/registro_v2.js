@@ -301,12 +301,18 @@ class RegistroV2 {
         });
     }
     
-    // ✅ NOVA FUNÇÃO: MOSTRAR REGISTROS SALVOS
+    
+    // ✅ NOVA FUNÇÃO: MOSTRAR REGISTROS SALVOS (ACUMULAR)
     mostrarRegistrosSalvos(associacoes, dataSalva) {
         const container = document.getElementById('registros-salvos');
         const lista = document.getElementById('lista-salvos');
         
         if (!container || !lista) return;
+        
+        // ✅ MOSTRAR CONTAINER SE ESTIVER OCULTO
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+        }
         
         // Agrupar por prefixo
         const porPrefixo = {};
@@ -318,19 +324,14 @@ class RegistroV2 {
             porPrefixo[assoc.prefixo].push(assoc);
         });
         
-        // Gerar HTML
-        let html = `
-            <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #28a745;">
-                <strong>📅 Data:</strong> ${dataSalva}<br>
-                <strong>📊 Total:</strong> ${associacoes.length} eletricista(s) registrado(s)
-            </div>
-        `;
+        // ✅ GERAR HTML DO NOVO BLOCO (não apagar o anterior!)
+        let novoBloco = '';
         
         // Para cada prefixo
         Object.keys(porPrefixo).sort().forEach(prefixo => {
             const eletricistas = porPrefixo[prefixo];
             
-            html += `
+            novoBloco += `
                 <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #667eea;">
                     <div style="font-weight: bold; color: #667eea; margin-bottom: 10px; font-size: 16px;">
                         🚗 Prefixo: ${prefixo}
@@ -339,7 +340,7 @@ class RegistroV2 {
             `;
             
             eletricistas.forEach((elet, index) => {
-                html += `
+                novoBloco += `
                     <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
                         <strong>${index + 1}. ${elet.nome}</strong><br>
                         <small style="color: #666;">Matrícula: ${elet.matricula}</small>
@@ -347,17 +348,32 @@ class RegistroV2 {
                 `;
             });
             
-            html += `
+            novoBloco += `
                     </div>
                 </div>
             `;
         });
         
-        lista.innerHTML = html;
-        container.style.display = 'block';
+        // ✅ SE FOR O PRIMEIRO REGISTRO, ADICIONAR CABEÇALHO
+        if (lista.innerHTML.trim() === '') {
+            lista.innerHTML = `
+                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #28a745;">
+                    <strong>📅 Data:</strong> ${dataSalva}<br>
+                    <strong>📊 Registros realizados nesta sessão</strong>
+                </div>
+            `;
+        }
+        
+        // ✅ ADICIONAR O NOVO BLOCO AO FINAL (não substituir!)
+        lista.innerHTML += novoBloco;
+        
+        // ✅ Atualizar contador total
+        const totalElementos = lista.querySelectorAll('strong').length - 1; // -1 do cabeçalho
         
         // Scroll suave até a seção
-        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     }
     
     // ==========================================
@@ -643,3 +659,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
