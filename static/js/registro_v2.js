@@ -182,7 +182,7 @@ class RegistroV2 {
             this.atualizarListaAssociacoes();
         });
         
-        // Botão Salvar Frequência
+        // Botão Salvar Frequência        
         if (btnSalvarFrequencia) {
             btnSalvarFrequencia.addEventListener('click', async () => {
                 if (this.associacoesTemporarias.length === 0) {
@@ -201,6 +201,9 @@ class RegistroV2 {
                     // Pegar data selecionada do campo
                     const dataRegistro = document.getElementById('data-registro').value;
                     
+                    // ✅ GUARDAR CÓPIA DAS ASSOCIAÇÕES ANTES DE SALVAR
+                    const associacoesSalvas = [...this.associacoesTemporarias];
+                    
                     const response = await fetch('/api/salvar-frequencia', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -213,8 +216,21 @@ class RegistroV2 {
                     const result = await response.json();
                     
                     if (result.success) {
-                        alert(`✅ ${result.total} associação(ões) salva(s) com sucesso!`);
-                        window.location.reload();
+                        // ✅ MOSTRAR LISTA DE SALVOS (NÃO RECARREGAR)
+                        this.mostrarRegistrosSalvos(associacoesSalvas, result.data);
+                        
+                        // ✅ LIMPAR ASSOCIAÇÕES PENDENTES
+                        this.associacoesTemporarias = [];
+                        this.atualizarListaAssociacoes();
+                        
+                        // ✅ ESCONDER PAINEL DE PENDENTES
+                        document.getElementById('associacoes-temporarias').style.display = 'none';
+                        
+                        // ✅ MOSTRAR TODOS OS CARDS NOVAMENTE
+                        document.querySelectorAll('.eletricista-card').forEach(card => {
+                            card.style.display = 'block';
+                        });
+                        
                     } else {
                         alert(`❌ Erro: ${result.erro}`);
                     }
@@ -568,3 +584,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
