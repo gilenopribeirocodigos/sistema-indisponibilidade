@@ -299,7 +299,66 @@ class RegistroV2 {
                 this.atualizarListaAssociacoes();
             });
         });
-    }    
+    }
+    
+    // ✅ NOVA FUNÇÃO: MOSTRAR REGISTROS SALVOS
+    mostrarRegistrosSalvos(associacoes, dataSalva) {
+        const container = document.getElementById('registros-salvos');
+        const lista = document.getElementById('lista-salvos');
+        
+        if (!container || !lista) return;
+        
+        // Agrupar por prefixo
+        const porPrefixo = {};
+        
+        associacoes.forEach(assoc => {
+            if (!porPrefixo[assoc.prefixo]) {
+                porPrefixo[assoc.prefixo] = [];
+            }
+            porPrefixo[assoc.prefixo].push(assoc);
+        });
+        
+        // Gerar HTML
+        let html = `
+            <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #28a745;">
+                <strong>📅 Data:</strong> ${dataSalva}<br>
+                <strong>📊 Total:</strong> ${associacoes.length} eletricista(s) registrado(s)
+            </div>
+        `;
+        
+        // Para cada prefixo
+        Object.keys(porPrefixo).sort().forEach(prefixo => {
+            const eletricistas = porPrefixo[prefixo];
+            
+            html += `
+                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #667eea;">
+                    <div style="font-weight: bold; color: #667eea; margin-bottom: 10px; font-size: 16px;">
+                        🚗 Prefixo: ${prefixo}
+                    </div>
+                    <div style="padding-left: 15px;">
+            `;
+            
+            eletricistas.forEach((elet, index) => {
+                html += `
+                    <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                        <strong>${index + 1}. ${elet.nome}</strong><br>
+                        <small style="color: #666;">Matrícula: ${elet.matricula}</small>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+        
+        lista.innerHTML = html;
+        container.style.display = 'block';
+        
+        // Scroll suave até a seção
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     
     // ==========================================
     // SEÇÃO 2: REMANEJADO
@@ -584,4 +643,3 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
-
