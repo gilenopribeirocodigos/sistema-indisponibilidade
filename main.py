@@ -641,13 +641,26 @@ async def salvar_frequencia(
         
         id_presente = motivo_presente.id
         
+        logger.info(f"📋 Salvando {len(associacoes)} associação(ões)...")
+        
         # Inserir cada associação
         for assoc in associacoes:
             eletricista_id = assoc.get('eletricista_id')
             prefixo = assoc.get('prefixo')
-            id_indisponibilidade = assoc.get('id_indisponibilidade', id_presente)
+            id_indisponibilidade_recebido = assoc.get('id_indisponibilidade')
+            
+            # ✅ LÓGICA CORRIGIDA:
+            # Se id_indisponibilidade for None ou null → PRESENÇA (usar id_presente)
+            # Se id_indisponibilidade tiver um valor → AUSÊNCIA (usar o valor recebido)
+            if id_indisponibilidade_recebido is None:
+                id_indisponibilidade_final = id_presente
+                logger.info(f"   ✅ PRESENÇA: Eletricista {eletricista_id} → Motivo ID {id_presente}")
+            else:
+                id_indisponibilidade_final = id_indisponibilidade_recebido
+                logger.info(f"   ⚠️ AUSÊNCIA: Eletricista {eletricista_id} → Motivo ID {id_indisponibilidade_recebido}")
             
             if not eletricista_id or not prefixo:
+                logger.warning(f"   ⚠️ Associação inválida: eletricista_id={eletricista_id}, prefixo={prefixo}")
                 continue
             
             # Verificar se já existe registro
@@ -662,6 +675,7 @@ async def salvar_frequencia(
             
             if ja_existe:
                 # Atualizar
+                logger.info(f"   🔄 Atualizando registro existente ID {ja_existe.id}")
                 db.execute(
                     text("""
                         UPDATE equipes_dia 
@@ -673,12 +687,13 @@ async def salvar_frequencia(
                     {
                         "prefixo": prefixo,
                         "supervisor": usuario.base_responsavel or usuario.nome,
-                        "id_indisponibilidade": id_indisponibilidade,
+                        "id_indisponibilidade": id_indisponibilidade_final,
                         "id": ja_existe.id
                     }
                 )
             else:
                 # Inserir novo
+                logger.info(f"   ➕ Inserindo novo registro")
                 db.execute(
                     text("""
                         INSERT INTO equipes_dia 
@@ -690,12 +705,13 @@ async def salvar_frequencia(
                         "prefixo": prefixo,
                         "data": data_obj,
                         "supervisor": usuario.base_responsavel or usuario.nome,
-                        "id_indisponibilidade": id_indisponibilidade,
+                        "id_indisponibilidade": id_indisponibilidade_final,
                         "usuario_id": usuario.id
                     }
                 )
         
         db.commit()
+        logger.info(f"✅ Salvamento concluído com sucesso!")
         
         return {
             "success": True,
@@ -704,7 +720,9 @@ async def salvar_frequencia(
         
     except Exception as e:
         db.rollback()
-        logger.error(f"Erro ao salvar frequência: {str(e)}")
+        logger.error(f"❌ Erro ao salvar frequência: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"success": False, "erro": str(e)}
 
 
@@ -2474,4 +2492,5 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
