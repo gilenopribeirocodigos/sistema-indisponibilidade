@@ -4,14 +4,19 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import get_db
 from models import Usuario
 from auth import verificar_senha
 import uvicorn
 import os
-from datetime import date
-import os
+from datetime import date, datetime, timedelta
+import logging
 from pathlib import Path
+
+# ✅ CONFIGURAR LOGGER
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configurar paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -72,7 +77,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # FUNÇÕES AUXILIARES DE SESSÃO
 # ========================================
 
-def get_usuario_logado(request: Request, db: Session):
+def get_usuario_logado(request: Request, db: Session = Depends(get_db)):
     """
     Retorna o usuário logado ou None.
     """
@@ -416,7 +421,6 @@ def registrar_v2_page(
         return RedirectResponse(url="/login")
     
     from models import EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
-    from datetime import datetime
     
     # Definir data (hoje ou data selecionada)
     if data:
@@ -541,7 +545,8 @@ def registrar_v2_page(
         {
             "request": request,
             "usuario": usuario,
-            "eletricistas": eletricistas,
+            "eletricistas_disponiveis": eletricistas,
+            "total_eletricistas": len(eletricistas),
             "prefixos_supervisor": prefixos_supervisor,
             "motivos": motivos,
             "hoje": hoje_formatado,
@@ -552,13 +557,50 @@ def registrar_v2_page(
     )
 
 
+# ==========================================
+# ROTA: BUSCAR MOTIVOS DE INDISPONIBILIDADE
+# ==========================================
+@app.get("/api/motivos-indisponibilidade")
+async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
+    """
+    Retorna lista de motivos EXCETO 'PRESENTE'
+    Para usar no select de ausência
+    """
+    try:
+        motivos = db.execute(
+            text("""
+                SELECT id, descricao 
+                FROM motivos_indisponibilidade 
+                WHERE ativo = true 
+                  AND UPPER(descricao) != 'PRESENTE'
+                ORDER BY descricao
+            """)
+        ).fetchall()
+        
+        return {
+            "success": True,
+            "motivos": [
+                {"id": m.id, "descricao": m.descricao} 
+                for m in motivos
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar motivos: {str(e)}")
+        return {"success": False, "erro": str(e)}
+
+
+# ==========================================
+# SALVAR FREQUÊNCIA (PRESENÇA/AUSÊNCIA)
+# ==========================================
 @app.post("/api/salvar-frequencia")
 async def salvar_frequencia(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Salvar associações de frequência em lote"""
-    
+    """
+    Salvar frequência (presença ou ausência)
+    """
     # Verificar autenticação
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
@@ -567,55 +609,98 @@ async def salvar_frequencia(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import EquipeDia
-    from datetime import datetime
-    
     try:
-        # Ler JSON do body
-        body = await request.json()
-        associacoes = body.get('associacoes', [])
-        data_registro = body.get('data', None)
+        dados = await request.json()
+        associacoes = dados.get('associacoes', [])
+        data_registro = dados.get('data')
         
         if not associacoes:
-            return JSONResponse({"success": False, "erro": "Nenhuma associação enviada"})
+            return {"success": False, "erro": "Nenhuma associação fornecida"}
         
-        # Definir data (hoje ou data informada)
-        if data_registro:
-            try:
-                data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
-            except:
-                data_obj = date.today()
-        else:
-            data_obj = date.today()
+        if not data_registro:
+            return {"success": False, "erro": "Data não fornecida"}
         
-        # Salvar cada associação
-        total_salvo = 0
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
+        except:
+            return {"success": False, "erro": "Data inválida"}
+        
+        # ✅ BUSCAR ID DO MOTIVO "PRESENTE"
+        motivo_presente = db.execute(
+            text("SELECT id FROM motivos_indisponibilidade WHERE UPPER(descricao) = 'PRESENTE'")
+        ).fetchone()
+        
+        if not motivo_presente:
+            return {"success": False, "erro": "Motivo 'PRESENTE' não encontrado no banco"}
+        
+        id_presente = motivo_presente.id
+        
+        # Inserir cada associação
         for assoc in associacoes:
-            nova_equipe = EquipeDia(
-                eletricista_id=assoc['eletricista_id'],
-                prefixo=assoc['prefixo'],
-                data=data_obj,
-                supervisor_registro=usuario.base_responsavel or usuario.nome,
-                usuario_registro=usuario.id  # ← ADICIONAR ESTA LINHA
-            )
-            db.add(nova_equipe)
-            total_salvo += 1
+            eletricista_id = assoc.get('eletricista_id')
+            prefixo = assoc.get('prefixo')
+            id_indisponibilidade = assoc.get('id_indisponibilidade', id_presente)
+            
+            if not eletricista_id or not prefixo:
+                continue
+            
+            # Verificar se já existe registro
+            ja_existe = db.execute(
+                text("""
+                    SELECT id FROM equipes_dia 
+                    WHERE eletricista_id = :elet_id 
+                      AND data = :data
+                """),
+                {"elet_id": eletricista_id, "data": data_obj}
+            ).fetchone()
+            
+            if ja_existe:
+                # Atualizar
+                db.execute(
+                    text("""
+                        UPDATE equipes_dia 
+                        SET prefixo = :prefixo,
+                            supervisor_registro = :supervisor,
+                            id_indisponibilidade = :id_indisponibilidade
+                        WHERE id = :id
+                    """),
+                    {
+                        "prefixo": prefixo,
+                        "supervisor": usuario.base_responsavel or usuario.nome,
+                        "id_indisponibilidade": id_indisponibilidade,
+                        "id": ja_existe.id
+                    }
+                )
+            else:
+                # Inserir novo
+                db.execute(
+                    text("""
+                        INSERT INTO equipes_dia 
+                        (eletricista_id, prefixo, data, supervisor_registro, id_indisponibilidade, usuario_registro)
+                        VALUES (:elet_id, :prefixo, :data, :supervisor, :id_indisponibilidade, :usuario_id)
+                    """),
+                    {
+                        "elet_id": eletricista_id,
+                        "prefixo": prefixo,
+                        "data": data_obj,
+                        "supervisor": usuario.base_responsavel or usuario.nome,
+                        "id_indisponibilidade": id_indisponibilidade,
+                        "usuario_id": usuario.id
+                    }
+                )
         
         db.commit()
         
-        return JSONResponse({
+        return {
             "success": True,
-            "total": total_salvo,
-            "data": data_obj.strftime('%d/%m/%Y'),
-            "mensagem": f"{total_salvo} associação(ões) salva(s) para {data_obj.strftime('%d/%m/%Y')}!"
-        })
+            "data": data_obj.strftime('%d/%m/%Y')
+        }
         
     except Exception as e:
         db.rollback()
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
+        logger.error(f"Erro ao salvar frequência: {str(e)}")
+        return {"success": False, "erro": str(e)}
 
 
 @app.post("/api/remanejar-eletricista")
@@ -744,7 +829,6 @@ async def salvar_indisponibilidade(
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
     from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
-    from datetime import datetime
     
     try:
         # Ler dados do formulário
@@ -752,7 +836,7 @@ async def salvar_indisponibilidade(
         
         eletricista_id = form_data.get('eletricista_id')
         prefixo = form_data.get('prefixo')
-        tipo_indisponibilidade = form_data.get('tipo_indisponibilidade')  # ← ADICIONAR
+        tipo_indisponibilidade = form_data.get('tipo_indisponibilidade')
         motivo_id = form_data.get('motivo_id')
         observacoes = form_data.get('observacoes', '')
         data_registro = form_data.get('data', None)
@@ -819,7 +903,7 @@ async def salvar_indisponibilidade(
             eletricista_id=eletricista_id,
             matricula=eletricista.matricula,
             prefixo=prefixo,
-            tipo_indisponibilidade=tipo_indisponibilidade,  # ← ADICIONAR
+            tipo_indisponibilidade=tipo_indisponibilidade,
             motivo_id=motivo_id,
             observacao=observacoes if observacoes else None,
             usuario_registro=usuario.id
@@ -860,7 +944,6 @@ def buscar_eletricistas(
     Para INDISPONIBILIDADE: exclui apenas os já registrados como indisponíveis.
     """
     from models import EstruturaEquipes, Indisponibilidade
-    from datetime import datetime
     
     # Verificar se tem termo de busca
     if not q or len(q) < 3:
@@ -888,7 +971,7 @@ def buscar_eletricistas(
     # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados como indisponíveis
     query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%"),        
-        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
     )
     
     # EXCLUIR apenas os já registrados como INDISPONÍVEIS
@@ -924,7 +1007,6 @@ def buscar_eletricistas_remanejar(
     NÃO exclui os já remanejados (para permitir atualização).
     """
     from models import EstruturaEquipes, EquipeDia, Indisponibilidade
-    from datetime import datetime
     
     # Verificar se tem termo de busca
     if not q or len(q) < 3:
@@ -960,7 +1042,7 @@ def buscar_eletricistas_remanejar(
     # Buscar eletricistas (case-insensitive) EXCLUINDO os bloqueados
     query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%"),
-        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
     )
     
     # EXCLUIR apenas os em Frequência ou Indisponíveis
@@ -1023,6 +1105,14 @@ def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
     return JSONResponse({"prefixos": resultado})
 
 
+# ========================================
+# RESTO DAS ROTAS (GESTÃO USUÁRIOS, RELATÓRIOS, ETC)
+# Mantenha todo o código que estava depois da linha 900
+# ========================================
+
+# (Continue com todas as outras rotas: gestão de usuários, relatórios, importação CSV, etc.)
+# Por questão de espaço, não estou replicando tudo aqui, mas você deve manter TODO o código
+# que vem depois da rota /api/buscar-prefixos no seu arquivo original
 # ========================================
 # ROTA DE DEBUG
 # ========================================
@@ -2404,119 +2494,13 @@ async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
         logger.error(f"Erro ao buscar motivos: {str(e)}")
         return {"success": False, "erro": str(e)}
 
-
-# ==========================================
-# MODIFICAR: SALVAR FREQUÊNCIA COM id_indisponibilidade
-# ==========================================
-@app.post("/api/salvar-frequencia")
-async def salvar_frequencia(
-    request: Request,
-    db: Session = Depends(get_db),
-    usuario_atual: dict = Depends(get_usuario_logado)
-):
-    """
-    Salvar frequência (presença ou ausência)
-    """
-    try:
-        dados = await request.json()
-        associacoes = dados.get('associacoes', [])
-        data_registro = dados.get('data')
-        
-        if not associacoes:
-            return {"success": False, "erro": "Nenhuma associação fornecida"}
-        
-        if not data_registro:
-            return {"success": False, "erro": "Data não fornecida"}
-        
-        # Converter data
-        try:
-            data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
-        except:
-            return {"success": False, "erro": "Data inválida"}
-        
-        # ✅ BUSCAR ID DO MOTIVO "PRESENTE"
-        motivo_presente = db.execute(
-            text("SELECT id FROM motivos_indisponibilidade WHERE UPPER(descricao) = 'PRESENTE'")
-        ).fetchone()
-        
-        if not motivo_presente:
-            return {"success": False, "erro": "Motivo 'PRESENTE' não encontrado no banco"}
-        
-        id_presente = motivo_presente.id
-        
-        # Inserir cada associação
-        for assoc in associacoes:
-            eletricista_id = assoc.get('eletricista_id')
-            prefixo = assoc.get('prefixo')
-            id_indisponibilidade = assoc.get('id_indisponibilidade', id_presente)  # ✅ Usa o id passado ou PRESENTE
-            
-            if not eletricista_id or not prefixo:
-                continue
-            
-            # Verificar se já existe registro
-            ja_existe = db.execute(
-                text("""
-                    SELECT id FROM equipes_dia 
-                    WHERE eletricista_id = :elet_id 
-                      AND data = :data
-                """),
-                {"elet_id": eletricista_id, "data": data_obj}
-            ).fetchone()
-            
-            if ja_existe:
-                # Atualizar
-                db.execute(
-                    text("""
-                        UPDATE equipes_dia 
-                        SET prefixo = :prefixo,
-                            supervisor_registro = :supervisor,
-                            id_indisponibilidade = :id_indisponibilidade
-                        WHERE id = :id
-                    """),
-                    {
-                        "prefixo": prefixo,
-                        "supervisor": usuario_atual['nome'],
-                        "id_indisponibilidade": id_indisponibilidade,
-                        "id": ja_existe.id
-                    }
-                )
-            else:
-                # Inserir novo
-                db.execute(
-                    text("""
-                        INSERT INTO equipes_dia 
-                        (eletricista_id, prefixo, data, supervisor_registro, id_indisponibilidade)
-                        VALUES (:elet_id, :prefixo, :data, :supervisor, :id_indisponibilidade)
-                    """),
-                    {
-                        "elet_id": eletricista_id,
-                        "prefixo": prefixo,
-                        "data": data_obj,
-                        "supervisor": usuario_atual['nome'],
-                        "id_indisponibilidade": id_indisponibilidade
-                    }
-                )
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "data": data_obj.strftime('%d/%m/%Y')
-        }
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Erro ao salvar frequência: {str(e)}")
-        return {"success": False, "erro": str(e)}
-
-
 # ========================================
 # EXECUTAR SERVIDOR
 # ========================================
 
 if __name__ == "__main__":
-
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
