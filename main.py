@@ -2412,7 +2412,7 @@ async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
 async def salvar_frequencia(
     request: Request,
     db: Session = Depends(get_db),
-    usuario_atual: dict = Depends(get_usuario_atual)
+    usuario_atual: dict = Depends(get_usuario_logado)
 ):
     """
     Salvar frequência (presença ou ausência)
@@ -2517,6 +2517,7 @@ async def salvar_frequencia(
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
