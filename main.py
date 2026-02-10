@@ -561,11 +561,15 @@ def registrar_v2_page(
 # ROTA: BUSCAR MOTIVOS DE INDISPONIBILIDADE
 # ==========================================
 @app.get("/api/motivos-indisponibilidade")
-async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
+async def buscar_motivos_indisponibilidade(request: Request, db: Session = Depends(get_db)):
     """
     Retorna lista de motivos EXCETO 'PRESENTE'
     Para usar no select de ausência
     """
+    # ✅ ADICIONAR VERIFICAÇÃO DE AUTENTICAÇÃO
+    if not verificar_autenticacao(request):
+        return {"success": False, "erro": "Não autenticado"}
+    
     try:
         motivos = db.execute(
             text("""
@@ -577,6 +581,8 @@ async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
             """)
         ).fetchall()
         
+        logger.info(f"✅ Retornando {len(motivos)} motivos de indisponibilidade")
+        
         return {
             "success": True,
             "motivos": [
@@ -586,9 +592,8 @@ async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
         }
         
     except Exception as e:
-        logger.error(f"Erro ao buscar motivos: {str(e)}")
+        logger.error(f"❌ Erro ao buscar motivos: {str(e)}")
         return {"success": False, "erro": str(e)}
-
 
 # ==========================================
 # SALVAR FREQUÊNCIA (PRESENÇA/AUSÊNCIA)
@@ -2469,3 +2474,4 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
