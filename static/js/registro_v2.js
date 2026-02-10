@@ -65,22 +65,51 @@ class RegistroV2 {
         
         let eletricistaSelecionados = [];
         let modoAtual = 'presenca'; // 'presenca' ou 'ausencia'
-        let limiteSelecao = 2; // 2 para presença, 1 para ausência
+        let limiteSelecao = 2; // 2 para presença, 1 para ausência        
         
-        // ✅ CARREGAR MOTIVOS DE AUSÊNCIA
+        // ✅ CARREGAR MOTIVOS DE AUSÊNCIA (VERSÃO MELHORADA)
         const carregarMotivos = async () => {
             try {
+                console.log('🔄 Iniciando carregamento de motivos...');
+                
                 const response = await fetch('/api/motivos-indisponibilidade');
+                
+                console.log('📡 Response status:', response.status);
+                console.log('📡 Response ok:', response.ok);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('📦 Data recebida:', data);
                 
                 if (data.success) {
+                    console.log(`✅ ${data.motivos.length} motivos carregados:`, data.motivos);
+                    
+                    if (data.motivos.length === 0) {
+                        console.warn('⚠️ Lista de motivos está vazia!');
+                        alert('⚠️ Nenhum motivo de ausência encontrado no sistema!');
+                        return;
+                    }
+                    
+                    // Preencher select com motivos
                     motivoSelect.innerHTML = '<option value="">Selecione o motivo...</option>';
                     data.motivos.forEach(motivo => {
                         motivoSelect.innerHTML += `<option value="${motivo.id}">${motivo.descricao}</option>`;
                     });
+                    
+                } else {
+                    console.error('❌ API retornou success: false');
+                    console.error('❌ Erro da API:', data.erro);
+                    alert(`❌ Erro do servidor: ${data.erro || 'Erro desconhecido'}`);
                 }
             } catch (error) {
-                console.error('Erro ao carregar motivos:', error);
+                console.error('❌ ERRO FATAL ao carregar motivos:');
+                console.error('   Tipo:', error.name);
+                console.error('   Mensagem:', error.message);
+                console.error('   Stack:', error.stack);
+                alert(`❌ Erro ao carregar motivos: ${error.message}\n\nVerifique o console (F12) para mais detalhes.`);
             }
         };
         
@@ -767,4 +796,5 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
 
