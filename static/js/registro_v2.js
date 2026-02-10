@@ -465,9 +465,78 @@ class RegistroV2 {
             confirmar: btnConfirmar,
             cancelar: btnCancelar
         });
+    }    
+    
+    // ==========================================
+    // CONFIRMAR MOTIVO (AUSÊNCIA)
+    // ==========================================
+    confirmarMotivo(eletId, eletNome, prefixo) {
+        console.log('🔵 confirmarMotivo chamada!');
+        console.log('   eletId:', eletId);
+        console.log('   eletNome:', eletNome);
+        console.log('   prefixo:', prefixo);
+        
+        const selectMotivo = document.getElementById('selectMotivo');
+        
+        if (!selectMotivo) {
+            console.error('❌ Select de motivo não encontrado!');
+            alert('❌ Erro: Select não encontrado');
+            return;
+        }
+        
+        const motivoId = selectMotivo.value;
+        console.log('   motivoId selecionado:', motivoId);
+        
+        if (!motivoId) {
+            alert('⚠️ Selecione um motivo!');
+            return;
+        }
+        
+        const motivo = this.motivosDisponiveis.find(m => m.id == motivoId);
+        console.log('   Motivo encontrado:', motivo);
+        
+        if (!motivo) {
+            console.error('❌ Motivo não encontrado no array!');
+            alert('❌ Erro: Motivo não encontrado');
+            return;
+        }
+        
+        const motivoDescricao = motivo.descricao;
+        
+        // Adicionar às associações pendentes
+        this.associacoesTemporarias.push({
+            eletricista_id: eletId,
+            nome: eletNome,
+            prefixo: prefixo,
+            tipo: 'ausencia',
+            id_indisponibilidade: motivoId,
+            motivo_descricao: motivoDescricao
+        });
+        
+        console.log('✅ Associação adicionada:', this.associacoesTemporarias);
+        
+        // Fechar modal
+        this.fecharModalMotivo(null);
+        
+        // Atualizar painel
+        this.atualizarListaAssociacoes();
+    }
+    
+    // ==========================================
+    // FECHAR MODAL MOTIVO
+    // ==========================================
+    fecharModalMotivo(checkbox) {
+        const modal = document.getElementById('modalMotivo');
+        if (modal) {
+            modal.remove();
+        }
+        
+        if (checkbox) {
+            checkbox.checked = false;
+        }
     }
 
-    
+        
     // ==========================================
     // LIMPAR TUDO
     // ==========================================
@@ -889,5 +958,6 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
 
