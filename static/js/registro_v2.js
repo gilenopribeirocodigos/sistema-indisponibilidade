@@ -363,36 +363,55 @@ class RegistroV2 {
         document.getElementById('painelIntermediario').style.display = 'none';
     }
     
+
     // ==========================================
-    // ABRIR MODAL AUSÊNCIA
+    // ABRIR MODAL AUSÊNCIA (VERSÃO CORRIGIDA)
     // ==========================================
     abrirModalMotivo(eletId, eletNome, prefixo, checkbox) {
-        const modalHTML = `
-            <div id="modalMotivo" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%;">
-                    <h3 style="margin-top: 0;">⚠️ Selecione o Motivo da Ausência</h3>
-                    <p><strong>Eletricista:</strong> ${eletNome}</p>
-                    
-                    <label style="display: block; margin-top: 20px; font-weight: bold;">Motivo:</label>
-                    <select id="selectMotivo" style="width: 100%; padding: 10px; margin-top: 10px; font-size: 16px;">
-                        <option value="">-- Selecione --</option>
-                    </select>
-                    
-                    <div style="margin-top: 30px; display: flex; gap: 10px;">
-                        <button id="btnConfirmarMotivo" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                            ✅ Confirmar
-                        </button>
-                        <button id="btnCancelarMotivo" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                            ❌ Cancelar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Remover modal antigo se existir
+        const modalAntigo = document.getElementById('modalMotivo');
+        if (modalAntigo) {
+            modalAntigo.remove();
+        }
         
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        // Criar container do modal
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'modalMotivo';
+        modalContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;';
         
-        const select = document.getElementById('selectMotivo');
+        // Criar conteúdo do modal
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = 'background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;';
+        
+        // Título
+        const titulo = document.createElement('h3');
+        titulo.style.marginTop = '0';
+        titulo.innerHTML = '⚠️ Selecione o Motivo da Ausência';
+        modalContent.appendChild(titulo);
+        
+        // Nome do eletricista
+        const nomeP = document.createElement('p');
+        nomeP.innerHTML = `<strong>Eletricista:</strong> ${eletNome}`;
+        modalContent.appendChild(nomeP);
+        
+        // Label
+        const label = document.createElement('label');
+        label.style.cssText = 'display: block; margin-top: 20px; font-weight: bold;';
+        label.textContent = 'Motivo:';
+        modalContent.appendChild(label);
+        
+        // Select
+        const select = document.createElement('select');
+        select.id = 'selectMotivo';
+        select.style.cssText = 'width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; box-sizing: border-box;';
+        
+        // Adicionar opção vazia
+        const optionVazia = document.createElement('option');
+        optionVazia.value = '';
+        optionVazia.textContent = '-- Selecione --';
+        select.appendChild(optionVazia);
+        
+        // Adicionar motivos
         this.motivosDisponiveis.forEach(motivo => {
             const option = document.createElement('option');
             option.value = motivo.id;
@@ -400,50 +419,41 @@ class RegistroV2 {
             select.appendChild(option);
         });
         
-        // Eventos
-        document.getElementById('btnConfirmarMotivo').onclick = () => {
+        modalContent.appendChild(select);
+        
+        // Container dos botões
+        const botoesDiv = document.createElement('div');
+        botoesDiv.style.cssText = 'margin-top: 30px; display: flex; gap: 10px;';
+        
+        // Botão Confirmar
+        const btnConfirmar = document.createElement('button');
+        btnConfirmar.id = 'btnConfirmarMotivo';
+        btnConfirmar.innerHTML = '✅ Confirmar';
+        btnConfirmar.style.cssText = 'flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
+        btnConfirmar.onclick = () => {
             this.confirmarMotivo(eletId, eletNome, prefixo);
         };
         
-        document.getElementById('btnCancelarMotivo').onclick = () => {
+        // Botão Cancelar
+        const btnCancelar = document.createElement('button');
+        btnCancelar.id = 'btnCancelarMotivo';
+        btnCancelar.innerHTML = '❌ Cancelar';
+        btnCancelar.style.cssText = 'flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
+        btnCancelar.onclick = () => {
             this.fecharModalMotivo(checkbox);
         };
+        
+        botoesDiv.appendChild(btnConfirmar);
+        botoesDiv.appendChild(btnCancelar);
+        modalContent.appendChild(botoesDiv);
+        
+        // Montar modal
+        modalContainer.appendChild(modalContent);
+        document.body.appendChild(modalContainer);
+        
+        console.log('✅ Modal criado com sucesso!');
     }
-    
-    confirmarMotivo(eletId, eletNome, prefixo) {
-        const motivoId = document.getElementById('selectMotivo').value;
-        
-        if (!motivoId) {
-            alert('⚠️ Selecione um motivo!');
-            return;
-        }
-        
-        const motivo = this.motivosDisponiveis.find(m => m.id == motivoId);
-        const motivoDescricao = motivo ? motivo.descricao : 'Desconhecido';
-        
-        this.associacoesTemporarias.push({
-            eletricista_id: eletId,
-            nome: eletNome,
-            prefixo: prefixo,
-            tipo: 'ausencia',
-            id_indisponibilidade: motivoId,
-            motivo_descricao: motivoDescricao
-        });
-        
-        this.fecharModalMotivo(null);
-        this.atualizarListaAssociacoes();
-    }
-    
-    fecharModalMotivo(checkbox) {
-        const modal = document.getElementById('modalMotivo');
-        if (modal) {
-            modal.remove();
-        }
-        
-        if (checkbox) {
-            checkbox.checked = false;
-        }
-    }
+
     
     // ==========================================
     // LIMPAR TUDO
@@ -866,3 +876,4 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
