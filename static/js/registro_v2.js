@@ -365,9 +365,11 @@ class RegistroV2 {
     
 
     // ==========================================
-    // ABRIR MODAL AUSÊNCIA (VERSÃO CORRIGIDA)
+    // ABRIR MODAL AUSÊNCIA (VERSÃO 100% CORRIGIDA)
     // ==========================================
     abrirModalMotivo(eletId, eletNome, prefixo, checkbox) {
+        console.log('🔵 abrirModalMotivo chamada para:', eletNome);
+        
         // Remover modal antigo se existir
         const modalAntigo = document.getElementById('modalMotivo');
         if (modalAntigo) {
@@ -412,6 +414,7 @@ class RegistroV2 {
         select.appendChild(optionVazia);
         
         // Adicionar motivos
+        console.log('🔵 Adicionando motivos ao select:', this.motivosDisponiveis);
         this.motivosDisponiveis.forEach(motivo => {
             const option = document.createElement('option');
             option.value = motivo.id;
@@ -425,23 +428,29 @@ class RegistroV2 {
         const botoesDiv = document.createElement('div');
         botoesDiv.style.cssText = 'margin-top: 30px; display: flex; gap: 10px;';
         
-        // Botão Confirmar
+        // ✅ Botão Confirmar (COM addEventListener)
         const btnConfirmar = document.createElement('button');
         btnConfirmar.id = 'btnConfirmarMotivo';
+        btnConfirmar.type = 'button'; // Importante!
         btnConfirmar.innerHTML = '✅ Confirmar';
         btnConfirmar.style.cssText = 'flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
-        btnConfirmar.onclick = () => {
-            this.confirmarMotivo(eletId, eletNome, prefixo);
-        };
         
-        // Botão Cancelar
+        btnConfirmar.addEventListener('click', () => {
+            console.log('🟢 Botão Confirmar CLICADO!');
+            this.confirmarMotivo(eletId, eletNome, prefixo);
+        });
+        
+        // ✅ Botão Cancelar (COM addEventListener)
         const btnCancelar = document.createElement('button');
         btnCancelar.id = 'btnCancelarMotivo';
+        btnCancelar.type = 'button'; // Importante!
         btnCancelar.innerHTML = '❌ Cancelar';
         btnCancelar.style.cssText = 'flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
-        btnCancelar.onclick = () => {
+        
+        btnCancelar.addEventListener('click', () => {
+            console.log('🔴 Botão Cancelar CLICADO!');
             this.fecharModalMotivo(checkbox);
-        };
+        });
         
         botoesDiv.appendChild(btnConfirmar);
         botoesDiv.appendChild(btnCancelar);
@@ -452,6 +461,10 @@ class RegistroV2 {
         document.body.appendChild(modalContainer);
         
         console.log('✅ Modal criado com sucesso!');
+        console.log('✅ Botões anexados:', {
+            confirmar: btnConfirmar,
+            cancelar: btnCancelar
+        });
     }
 
     
@@ -876,4 +889,5 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
