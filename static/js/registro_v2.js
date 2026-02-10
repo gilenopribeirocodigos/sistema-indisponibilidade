@@ -552,7 +552,7 @@ class RegistroV2 {
         
         this.atualizarListaAssociacoes();
     }
-    
+
     // ==========================================
     // ATUALIZAR LISTA DE ASSOCIAÇÕES PENDENTES
     // ==========================================
@@ -591,9 +591,82 @@ class RegistroV2 {
             }
         });
         
+        // ✅ ADICIONAR BOTÕES DE AÇÃO
+        html += `
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button onclick="registroV2.limparTudo()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                    🗑️ Limpar Todas
+                </button>
+                <button id="btn-salvar-frequencia-dinamico" style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;">
+                    💾 Salvar Todas as Associações
+                </button>
+            </div>
+        `;
+        
         html += '</div>';
         painel.innerHTML = html;
-    }
+        
+        // ✅ ADICIONAR EVENTO AO BOTÃO SALVAR (DINÂMICO)
+        const btnSalvar = document.getElementById('btn-salvar-frequencia-dinamico');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', async () => {
+                if (this.associacoesTemporarias.length === 0) {
+                    alert('⚠️ Não há associações para salvar!');
+                    return;
+                }
+                
+                if (!confirm(`💾 Salvar ${this.associacoesTemporarias.length} registro(s)?`)) {
+                    return;
+                }
+                
+                try {
+                    btnSalvar.disabled = true;
+                    btnSalvar.textContent = '⏳ Salvando...';
+                    
+                    const dataRegistro = document.querySelector('input[name="data"]').value;
+                    const associacoesSalvas = [...this.associacoesTemporarias];
+                    
+                    const response = await fetch('/api/salvar-frequencia', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            associacoes: this.associacoesTemporarias.map(a => ({
+                                eletricista_id: a.eletricista_id,
+                                prefixo: a.prefixo,
+                                id_indisponibilidade: a.id_indisponibilidade
+                            })),
+                            data: dataRegistro 
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.mostrarRegistrosSalvos(associacoesSalvas, result.data);
+                        
+                        // Remover eletricistas salvos da tela
+                        this.associacoesTemporarias.forEach(assoc => {
+                            const card = document.querySelector(`.eletricista-card[data-id="${assoc.eletricista_id}"]`);
+                            if (card) card.remove();
+                        });
+                        
+                        this.associacoesTemporarias = [];
+                        this.atualizarListaAssociacoes();
+                        
+                        painel.style.display = 'none';
+                    } else {
+                        alert(`❌ Erro: ${result.erro}`);
+                    }
+                    
+                } catch (error) {
+                    alert('❌ Erro ao salvar: ' + error.message);
+                } finally {
+                    btnSalvar.disabled = false;
+                    btnSalvar.textContent = '💾 Salvar Todas as Associações';
+                }
+            });
+        }
+    } 
     
     removerAssociacao(index) {
         const assoc = this.associacoesTemporarias[index];
@@ -958,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
 
 
