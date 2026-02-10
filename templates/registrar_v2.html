@@ -247,31 +247,39 @@
         </div>
     </div>
 
+    #######
     <script src="/static/js/registro_v2.js?v=2"></script>
     <script>
     // ==========================================
     // VARIÁVEIS GLOBAIS
     // ==========================================
     let associacoesPendentes = [];
+    let registrosSalvos = []; // ✅ NOVA: Lista acumulada de registros salvos
     let motivosDisponiveis = [];
+    let motivosCarregados = false; // ✅ Flag para controlar carregamento
     
     // ==========================================
-    // CARREGAR MOTIVOS
+    // CARREGAR MOTIVOS DE INDISPONIBILIDADE
     // ==========================================
     async function carregarMotivos() {
         try {
+            console.log('🔄 Carregando motivos...');
             const response = await fetch('/api/motivos-indisponibilidade');
             const data = await response.json();
             
             if (data.success) {
                 motivosDisponiveis = data.motivos;
+                motivosCarregados = true;
                 console.log('✅ Motivos carregados:', motivosDisponiveis);
+            } else {
+                console.error('❌ Erro ao carregar motivos:', data.erro);
             }
         } catch (error) {
             console.error('❌ Erro ao carregar motivos:', error);
         }
     }
     
+    // Carregar motivos ao iniciar
     document.addEventListener('DOMContentLoaded', function() {
         carregarMotivos();
     });
@@ -338,12 +346,25 @@
     // ==========================================
     // FUNÇÃO: AUSÊNCIA
     // ==========================================
-    function handleAusenciaClick(checkbox) {
+    async function handleAusenciaClick(checkbox) {
         const eletId = checkbox.value;
         const eletNome = checkbox.dataset.nome;
         const prefixoSugerido = checkbox.dataset.prefixo;
         
         if (checkbox.checked) {
+            // ✅ GARANTIR QUE OS MOTIVOS ESTEJAM CARREGADOS
+            if (!motivosCarregados || motivosDisponiveis.length === 0) {
+                console.log('⏳ Motivos não carregados ainda, aguardando...');
+                await carregarMotivos();
+            }
+            
+            // ✅ VERIFICAR NOVAMENTE
+            if (motivosDisponiveis.length === 0) {
+                alert('❌ Erro ao carregar motivos de ausência. Tente novamente.');
+                checkbox.checked = false;
+                return;
+            }
+            
             document.querySelectorAll('.checkbox-eletricista').forEach(cb => {
                 if (cb !== checkbox) {
                     cb.checked = false;
@@ -388,13 +409,24 @@
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         
+        // ✅ PREENCHER SELECT COM MOTIVOS
         const select = document.getElementById('selectMotivo');
+        
+        console.log('📋 Preenchendo select com', motivosDisponiveis.length, 'motivos');
+        
         motivosDisponiveis.forEach(motivo => {
             const option = document.createElement('option');
             option.value = motivo.id;
             option.textContent = motivo.descricao;
             select.appendChild(option);
+            console.log('  ✅ Adicionado:', motivo.descricao);
         });
+        
+        // ✅ LOG PARA DEBUG
+        if (motivosDisponiveis.length === 0) {
+            console.error('❌ NENHUM MOTIVO DISPONÍVEL!');
+            alert('❌ Erro: Nenhum motivo de ausência encontrado no sistema!');
+        }
     }
     
     // ==========================================
@@ -442,7 +474,7 @@
     }
     
     // ==========================================
-    // ATUALIZAR PAINEL
+    // ATUALIZAR PAINEL DE ASSOCIAÇÕES PENDENTES
     // ==========================================
     function atualizarPainelAssociacoes() {
         const painel = document.getElementById('painelAssociacoes');
@@ -493,6 +525,84 @@
     }
     
     // ==========================================
+    // ✅ NOVA: ATUALIZAR PAINEL DE REGISTROS SALVOS
+    // ==========================================
+    function atualizarPainelRegistrosSalvos() {
+        // Criar painel se não existir
+        let painelSalvos = document.getElementById('painelRegistrosSalvos');
+        
+        if (!painelSalvos) {
+            painelSalvos = document.createElement('div');
+            painelSalvos.id = 'painelRegistrosSalvos';
+            painelSalvos.style.marginTop = '30px';
+            
+            const painelAssoc = document.getElementById('painelAssociacoes');
+            painelAssoc.parentNode.insertBefore(painelSalvos, painelAssoc.nextSibling);
+        }
+        
+        if (registrosSalvos.length === 0) {
+            painelSalvos.style.display = 'none';
+            return;
+        }
+        
+        painelSalvos.style.display = 'block';
+        
+        // Agrupar por prefixo
+        const porPrefixo = {};
+        registrosSalvos.forEach(reg => {
+            if (!porPrefixo[reg.prefixo]) {
+                porPrefixo[reg.prefixo] = [];
+            }
+            porPrefixo[reg.prefixo].push(reg);
+        });
+        
+        let html = `
+            <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 10px; padding: 20px;">
+                <h4 style="color: #155724; margin-top: 0;">✅ Registros Salvos com Sucesso</h4>
+                <p style="color: #155724;">📅 Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+        `;
+        
+        for (const [prefixo, registros] of Object.entries(porPrefixo)) {
+            html += `
+                <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff;">
+                    <div style="color: #007bff; font-weight: bold; margin-bottom: 10px;">
+                        🚗 Prefixo: ${prefixo}
+                    </div>
+            `;
+            
+            registros.forEach((reg, idx) => {
+                if (reg.tipo === 'presenca') {
+                    html += `
+                        <div style="padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 3px;">
+                            <strong>${idx + 1}. ${reg.nome}</strong><br>
+                            <small>Matrícula: ${reg.eletricista_id}</small>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div style="padding: 8px; margin: 5px 0; background: #fff3cd; border-radius: 3px; border-left: 3px solid #ffc107;">
+                            <strong>${idx + 1}. ${reg.nome}</strong><br>
+                            <small>Matrícula: ${reg.eletricista_id}</small><br>
+                            <span style="color: #856404;">⚠️ Motivo: ${reg.motivo_descricao}</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            html += '</div>';
+        }
+        
+        html += `
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                ➕ Continuar Registrando
+            </button>
+        </div>
+        `;
+        
+        painelSalvos.innerHTML = html;
+    }
+    
+    // ==========================================
     // REMOVER ASSOCIAÇÃO
     // ==========================================
     function removerAssociacao(index) {
@@ -508,7 +618,7 @@
     }
     
     // ==========================================
-    // LIMPAR TODAS
+    // LIMPAR TODAS AS ASSOCIAÇÕES
     // ==========================================
     function limparTodasAssociacoes() {
         if (!confirm('Tem certeza que deseja limpar todas as associações?')) {
@@ -527,7 +637,7 @@
     }
     
     // ==========================================
-    // SALVAR FREQUÊNCIA
+    // ✅ CORRIGIDO: SALVAR FREQUÊNCIA
     // ==========================================
     async function salvarFrequencia() {
         if (associacoesPendentes.length === 0) {
@@ -563,16 +673,35 @@
             const result = await response.json();
             
             if (result.success) {
-                alert(`✅ Frequência salva com sucesso para ${result.data}!`);
+                // ✅ ADICIONAR À LISTA DE SALVOS (NÃO FAZER RELOAD)
+                registrosSalvos.push(...associacoesPendentes);
                 
-                associacoesPendentes = [];
-                atualizarPainelAssociacoes();
-                
-                document.querySelectorAll('.checkbox-eletricista').forEach(cb => {
-                    cb.checked = false;
+                // Limpar pendentes
+                associacoesPendentes.forEach(assoc => {
+                    const checkbox = document.querySelector(`.checkbox-eletricista[value="${assoc.eletricista_id}"]`);
+                    if (checkbox) {
+                        checkbox.checked = false;
+                        // Remover o card da lista (não está mais disponível)
+                        const card = checkbox.closest('.eletricista-card');
+                        if (card) {
+                            card.remove();
+                        }
+                    }
                 });
                 
-                location.reload();
+                associacoesPendentes = [];
+                
+                // Atualizar painéis
+                atualizarPainelAssociacoes();
+                atualizarPainelRegistrosSalvos();
+                
+                // Scroll suave para os registros salvos
+                setTimeout(() => {
+                    document.getElementById('painelRegistrosSalvos').scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                }, 100);
                 
             } else {
                 alert(`❌ Erro: ${result.erro}`);
@@ -587,3 +716,4 @@
     
 </body>
 </html>
+
