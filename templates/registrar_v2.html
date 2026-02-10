@@ -64,102 +64,138 @@
             </button>
         </div>
 
-        <!-- ========================================
-             SEÇÃO 1: FREQUÊNCIA
-        ======================================== -->
+        <!-- ==========================================
+             SEÇÃO 1: FREQUÊNCIA (PRESENÇA/AUSÊNCIA)
+             ========================================== -->
         <div id="secao-frequencia" class="secao-operacao active">
-            <div class="form-section">
-                <h3>📊 Controle de Frequência</h3>
-                <p class="section-subtitle">
-                    Selecione os eletricistas presentes e associe aos prefixos. 
-                    <strong>Total: {{ eletricistas|length }} eletricista(s)</strong>
-                </p>
+            
+            <!-- ✅ NOVO: SELETOR PRESENÇA/AUSÊNCIA -->
+            <div class="tipo-registro-selector">
+                <h4>📋 Tipo de Registro:</h4>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="tipo-registro" value="presenca" checked>
+                        <span class="radio-custom"></span>
+                        <span class="radio-text">✅ Presença</span>
+                    </label>
+                    
+                    <label class="radio-label">
+                        <input type="radio" name="tipo-registro" value="ausencia">
+                        <span class="radio-custom"></span>
+                        <span class="radio-text">⚠️ Ausência</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="frequencia-container">
                 
-                <!-- Lista de eletricistas com checkbox -->
-                <div class="eletricistas-grid">
-                    {% for elet in eletricistas %}
+                <!-- PAINEL DE CONTROLE -->
+                <div class="painel-controle">
+                    <h4>
+                        📊 Controle de Frequência
+                        <span id="contador-selecao" class="contador-badge">0/2</span>
+                    </h4>
+                    <p class="hint-text" id="hint-selecao">
+                        Selecione os eletricistas presentes e associe aos prefixos. Total: {{ total_eletricistas }} eletricista(s)
+                    </p>
+                </div>
+                
+                <!-- GRID DE ELETRICISTAS -->
+                <div class="eletricistas-grid" id="grid-eletricistas">
+                    {% for elet in eletricistas_disponiveis %}
                     <div class="eletricista-card" data-id="{{ elet.id }}">
-                        <input 
-                            type="checkbox" 
-                            id="elet-{{ elet.id }}" 
-                            class="eletricista-checkbox"
-                            data-nome="{{ elet.colaborador }}"
-                            data-matricula="{{ elet.matricula }}"
-                            data-prefixo="{{ elet.prefixo }}"
-                            data-base="{{ elet.base }}"
-                        >
-                        <label for="elet-{{ elet.id }}">
-                            <div class="elet-nome">{{ elet.colaborador }}</div>
-                            <div class="elet-info">
-                                <span>Mat: {{ elet.matricula }}</span>
-                                <span>{{ elet.prefixo }}</span>
+                        <label class="card-label">
+                            <input 
+                                type="checkbox" 
+                                class="eletricista-checkbox"
+                                data-id="{{ elet.id }}"
+                                data-nome="{{ elet.nome }}"
+                                data-matricula="{{ elet.matricula }}"
+                                data-prefixo="{{ elet.prefixo }}"
+                                data-base="{{ elet.base }}"
+                            >
+                            <div class="card-content">
+                                <div class="card-nome">{{ elet.nome }}</div>
+                                <div class="card-info">
+                                    <span>Mat: {{ elet.matricula }}</span>
+                                    <span>{{ elet.base }}</span>
+                                </div>
+                                <div class="card-prefixo">{{ elet.prefixo }}</div>
                             </div>
                         </label>
                     </div>
                     {% endfor %}
                 </div>
-
-                <!-- Painel de associação -->
-                <div class="associacao-panel">
-                    <div class="associacao-header">
-                        <h4>
-                            Eletricistas Selecionados: 
-                            <span id="contador-selecao" class="contador-badge">0/2</span>
-                        </h4>
-                        <div id="eletricista-info" class="info-vazia">
-                            Selecione até 2 eletricistas acima
+                
+                <!-- PAINEL DE INFORMAÇÕES DOS SELECIONADOS -->
+                <div class="painel-informacoes">
+                    <div id="eletricista-info" class="info-selecionados info-vazia">
+                        Selecione até 2 eletricistas acima
+                    </div>
+                    
+                    <!-- ✅ PAINEL PRESENÇA (default) -->
+                    <div id="painel-presenca" class="painel-opcoes">
+                        <div class="form-group">
+                            <label for="prefixo-frequencia">Prefixo da Equipe:</label>
+                            <input 
+                                type="text" 
+                                id="prefixo-frequencia" 
+                                placeholder="Digite ou selecione..."
+                                class="form-control"
+                            >
+                            <small class="hint-text">Sistema sugere o prefixo, mas você pode alterar</small>
                         </div>
+                        
+                        <button id="btn-associar" class="btn btn-primary btn-block" disabled>
+                            ✓ Associar ao Prefixo
+                        </button>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="prefixo-frequencia">Prefixo da Equipe:</label>
-                        <input 
-                            type="text" 
-                            id="prefixo-frequencia" 
-                            placeholder="Digite ou selecione..."
-                            list="prefixos-lista"
-                        >
-                        <datalist id="prefixos-lista">
-                            {% for prefixo in prefixos_supervisor %}
-                            <option value="{{ prefixo }}">
-                            {% endfor %}
-                        </datalist>
-                        <small class="help-text">Sistema sugere o prefixo, mas você pode alterar</small>
+                    <!-- ✅ PAINEL AUSÊNCIA (oculto inicialmente) -->
+                    <div id="painel-ausencia" class="painel-opcoes" style="display: none;">
+                        <div class="form-group">
+                            <label for="motivo-ausencia">Motivo da Ausência: <span style="color: red;">*</span></label>
+                            <select id="motivo-ausencia" class="form-control">
+                                <option value="">Selecione o motivo...</option>
+                                <!-- Preenchido via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <button id="btn-registrar-ausencia" class="btn btn-warning btn-block" disabled>
+                            ⚠️ Registrar Ausência
+                        </button>
                     </div>
-                    
-                    <button id="btn-associar" class="btn btn-primary btn-lg" disabled>
-                        ✅ Associar ao Prefixo
+                </div>
+            </div>
+            
+            <!-- RESTO DO CÓDIGO PERMANECE IGUAL (Associações Pendentes, Registros Salvos, etc) -->
+            
+            <!-- Associações Pendentes -->
+            <div id="associacoes-temporarias" style="display: none;">
+                <h4>📋 Associações Pendentes de Salvamento:</h4>
+                <div id="lista-associacoes"></div>
+                
+                <div class="acoes-associacoes">
+                    <button id="btn-limpar-todas" class="btn btn-secondary">
+                        🗑️ Limpar Todas
+                    </button>
+                    <button id="btn-salvar-frequencia" class="btn btn-success">
+                        💾 Salvar Todas as Associações
                     </button>
                 </div>
-
-                <!-- Lista de associações temporárias -->
-                <div id="associacoes-temporarias" style="display:none;">
-                    <h4>📋 Associações Pendentes de Salvamento:</h4>
-                    <div id="lista-associacoes"></div>
-                    <div class="acoes-finais">
-                        <button id="btn-limpar-todas" class="btn btn-secondary">
-                            🗑️ Limpar Todas
-                        </button>
-                        <button id="btn-salvar-frequencia" class="btn btn-success btn-lg">
-                            💾 Salvar Todas as Associações
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- ✅ NOVO: LISTA DE REGISTROS SALVOS -->
-                <div id="registros-salvos" style="display:none; margin-top: 30px;">
-                    <h4 style="color: #28a745; border-bottom: 3px solid #28a745; padding-bottom: 10px;">
-                        ✅ Registros Salvos com Sucesso
-                    </h4>
-                    <div id="lista-salvos" style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-top: 15px;"></div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button id="btn-continuar-registrando" class="btn btn-primary" onclick="window.location.reload()">
-                            ➕ Continuar Registrando
-                        </button>
-                    </div>
-                </div>
-                
             </div>
+            
+            <!-- Registros Salvos -->
+            <div id="registros-salvos" style="display:none;">
+                <h4 style="color: #28a745; border-bottom: 3px solid #28a745; padding-bottom: 10px;">
+                    ✅ Registros Salvos com Sucesso
+                </h4>
+                <div id="lista-salvos"></div>
+                <button id="btn-continuar-registrando" onclick="window.location.reload()" class="btn btn-primary" style="margin-top: 20px;">
+                    ➕ Continuar Registrando
+                </button>
+            </div>
+            
         </div>
 
         <!-- ========================================
@@ -294,4 +330,5 @@
 </body>
 
 </html>
+
 
