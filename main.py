@@ -2372,6 +2372,143 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
         resultado["traceback"] = traceback.format_exc()
         return JSONResponse(resultado)
 
+# ==========================================
+# ROTA: BUSCAR MOTIVOS DE INDISPONIBILIDADE
+# ==========================================
+@app.get("/api/motivos-indisponibilidade")
+async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
+    """
+    Retorna lista de motivos EXCETO 'PRESENTE'
+    Para usar no select de ausência
+    """
+    try:
+        motivos = db.execute(
+            text("""
+                SELECT id, descricao 
+                FROM motivos_indisponibilidade 
+                WHERE ativo = true 
+                  AND UPPER(descricao) != 'PRESENTE'
+                ORDER BY descricao
+            """)
+        ).fetchall()
+        
+        return {
+            "success": True,
+            "motivos": [
+                {"id": m.id, "descricao": m.descricao} 
+                for m in motivos
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar motivos: {str(e)}")
+        return {"success": False, "erro": str(e)}
+
+
+# ==========================================
+# MODIFICAR: SALVAR FREQUÊNCIA COM id_indisponibilidade
+# ==========================================
+@app.post("/api/salvar-frequencia")
+async def salvar_frequencia(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario_atual: dict = Depends(get_usuario_atual)
+):
+    """
+    Salvar frequência (presença ou ausência)
+    """
+    try:
+        dados = await request.json()
+        associacoes = dados.get('associacoes', [])
+        data_registro = dados.get('data')
+        
+        if not associacoes:
+            return {"success": False, "erro": "Nenhuma associação fornecida"}
+        
+        if not data_registro:
+            return {"success": False, "erro": "Data não fornecida"}
+        
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
+        except:
+            return {"success": False, "erro": "Data inválida"}
+        
+        # ✅ BUSCAR ID DO MOTIVO "PRESENTE"
+        motivo_presente = db.execute(
+            text("SELECT id FROM motivos_indisponibilidade WHERE UPPER(descricao) = 'PRESENTE'")
+        ).fetchone()
+        
+        if not motivo_presente:
+            return {"success": False, "erro": "Motivo 'PRESENTE' não encontrado no banco"}
+        
+        id_presente = motivo_presente.id
+        
+        # Inserir cada associação
+        for assoc in associacoes:
+            eletricista_id = assoc.get('eletricista_id')
+            prefixo = assoc.get('prefixo')
+            id_indisponibilidade = assoc.get('id_indisponibilidade', id_presente)  # ✅ Usa o id passado ou PRESENTE
+            
+            if not eletricista_id or not prefixo:
+                continue
+            
+            # Verificar se já existe registro
+            ja_existe = db.execute(
+                text("""
+                    SELECT id FROM equipes_dia 
+                    WHERE eletricista_id = :elet_id 
+                      AND data = :data
+                """),
+                {"elet_id": eletricista_id, "data": data_obj}
+            ).fetchone()
+            
+            if ja_existe:
+                # Atualizar
+                db.execute(
+                    text("""
+                        UPDATE equipes_dia 
+                        SET prefixo = :prefixo,
+                            supervisor_registro = :supervisor,
+                            id_indisponibilidade = :id_indisponibilidade
+                        WHERE id = :id
+                    """),
+                    {
+                        "prefixo": prefixo,
+                        "supervisor": usuario_atual['nome'],
+                        "id_indisponibilidade": id_indisponibilidade,
+                        "id": ja_existe.id
+                    }
+                )
+            else:
+                # Inserir novo
+                db.execute(
+                    text("""
+                        INSERT INTO equipes_dia 
+                        (eletricista_id, prefixo, data, supervisor_registro, id_indisponibilidade)
+                        VALUES (:elet_id, :prefixo, :data, :supervisor, :id_indisponibilidade)
+                    """),
+                    {
+                        "elet_id": eletricista_id,
+                        "prefixo": prefixo,
+                        "data": data_obj,
+                        "supervisor": usuario_atual['nome'],
+                        "id_indisponibilidade": id_indisponibilidade
+                    }
+                )
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "data": data_obj.strftime('%d/%m/%Y')
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Erro ao salvar frequência: {str(e)}")
+        return {"success": False, "erro": str(e)}
+
 
 # ========================================
 # EXECUTAR SERVIDOR
@@ -2380,6 +2517,7 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
 if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
