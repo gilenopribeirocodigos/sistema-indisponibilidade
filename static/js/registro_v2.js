@@ -35,38 +35,107 @@ class RegistroV2 {
                 document.getElementById(`secao-${tipo}`).classList.add('active');
             });
         });
-    }
+    }    
     
     // ==========================================
-    // SEÇÃO 1: FREQUÊNCIA - ATÉ 2 SELEÇÕES
+    // SEÇÃO 1: FREQUÊNCIA - PRESENÇA/AUSÊNCIA
     // ==========================================
     setupFrequencia() {
         const checkboxes = document.querySelectorAll('.eletricista-checkbox');
         const eletricistagInfo = document.getElementById('eletricista-info');
         const contadorSelecao = document.getElementById('contador-selecao');
+        const hintSelecao = document.getElementById('hint-selecao');
+        
+        // ✅ ELEMENTOS PRESENÇA
         const prefixoInput = document.getElementById('prefixo-frequencia');
         const btnAssociar = document.getElementById('btn-associar');
+        const painelPresenca = document.getElementById('painel-presenca');
+        
+        // ✅ ELEMENTOS AUSÊNCIA
+        const motivoSelect = document.getElementById('motivo-ausencia');
+        const btnRegistrarAusencia = document.getElementById('btn-registrar-ausencia');
+        const painelAusencia = document.getElementById('painel-ausencia');
+        
+        // ✅ RADIO BUTTONS
+        const radioPresenca = document.querySelector('input[name="tipo-registro"][value="presenca"]');
+        const radioAusencia = document.querySelector('input[name="tipo-registro"][value="ausencia"]');
+        
         const btnSalvarFrequencia = document.getElementById('btn-salvar-frequencia');
         const btnLimparTodas = document.getElementById('btn-limpar-todas');
         
-        let eletricistaSelecionados = []; // Array para até 2 eletricistas
+        let eletricistaSelecionados = [];
+        let modoAtual = 'presenca'; // 'presenca' ou 'ausencia'
+        let limiteSelecao = 2; // 2 para presença, 1 para ausência
         
-        // Função para atualizar interface
+        // ✅ CARREGAR MOTIVOS DE AUSÊNCIA
+        const carregarMotivos = async () => {
+            try {
+                const response = await fetch('/api/motivos-indisponibilidade');
+                const data = await response.json();
+                
+                if (data.success) {
+                    motivoSelect.innerHTML = '<option value="">Selecione o motivo...</option>';
+                    data.motivos.forEach(motivo => {
+                        motivoSelect.innerHTML += `<option value="${motivo.id}">${motivo.descricao}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar motivos:', error);
+            }
+        };
+        
+        // Carregar motivos ao iniciar
+        carregarMotivos();
+        
+        // ✅ ALTERNAR ENTRE PRESENÇA/AUSÊNCIA
+        const alternarModo = (novoModo) => {
+            modoAtual = novoModo;
+            
+            if (novoModo === 'presenca') {
+                limiteSelecao = 2;
+                painelPresenca.style.display = 'block';
+                painelAusencia.style.display = 'none';
+                contadorSelecao.textContent = '0/2';
+                hintSelecao.textContent = 'Selecione até 2 eletricistas e associe ao prefixo';
+            } else {
+                limiteSelecao = 1;
+                painelPresenca.style.display = 'none';
+                painelAusencia.style.display = 'block';
+                contadorSelecao.textContent = '0/1';
+                hintSelecao.textContent = 'Selecione 1 eletricista e informe o motivo da ausência';
+            }
+            
+            // Limpar seleções ao trocar de modo
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                cb.disabled = false;
+                cb.closest('.eletricista-card').style.opacity = '1';
+            });
+            
+            eletricistaSelecionados = [];
+            atualizarInterface();
+        };
+        
+        // Eventos dos radio buttons
+        radioPresenca.addEventListener('change', () => alternarModo('presenca'));
+        radioAusencia.addEventListener('change', () => alternarModo('ausencia'));
+        
+        // ✅ ATUALIZAR INTERFACE
         const atualizarInterface = () => {
             const qtdSelecionados = eletricistaSelecionados.length;
             
             // Atualizar contador
-            contadorSelecao.textContent = `${qtdSelecionados}/2`;
+            contadorSelecao.textContent = `${qtdSelecionados}/${limiteSelecao}`;
             contadorSelecao.className = 'contador-badge';
-            if (qtdSelecionados === 2) {
+            if (qtdSelecionados === limiteSelecao) {
                 contadorSelecao.classList.add('contador-completo');
-            } else if (qtdSelecionados === 1) {
+            } else if (qtdSelecionados > 0) {
                 contadorSelecao.classList.add('contador-parcial');
             }
             
-            // Desabilitar outros checkboxes se já tiver 2 selecionados
+            // Desabilitar checkboxes se atingiu limite
             checkboxes.forEach(cb => {
-                if (!cb.checked && qtdSelecionados >= 2) {
+                if (!cb.checked && qtdSelecionados >= limiteSelecao) {
                     cb.disabled = true;
                     cb.closest('.eletricista-card').style.opacity = '0.5';
                 } else if (!cb.checked) {
@@ -77,11 +146,17 @@ class RegistroV2 {
             
             // Atualizar painel de informações
             if (qtdSelecionados === 0) {
-                eletricistagInfo.innerHTML = 'Selecione até 2 eletricistas acima';
+                eletricistagInfo.innerHTML = `Selecione até ${limiteSelecao} eletricista(s) acima`;
                 eletricistagInfo.classList.remove('info-preenchida');
                 eletricistagInfo.classList.add('info-vazia');
-                prefixoInput.value = '';
-                btnAssociar.disabled = true;
+                
+                if (modoAtual === 'presenca') {
+                    prefixoInput.value = '';
+                    btnAssociar.disabled = true;
+                } else {
+                    motivoSelect.value = '';
+                    btnRegistrarAusencia.disabled = true;
+                }
             } else {
                 const htmlEletricistas = eletricistaSelecionados.map((elet, index) => `
                     <div class="eletricista-selecionado">
@@ -94,16 +169,19 @@ class RegistroV2 {
                 eletricistagInfo.classList.add('info-preenchida');
                 eletricistagInfo.classList.remove('info-vazia');
                 
-                // Sugerir prefixo do primeiro selecionado
-                if (!prefixoInput.value) {
-                    prefixoInput.value = eletricistaSelecionados[0].prefixo;
+                if (modoAtual === 'presenca') {
+                    // Sugerir prefixo do primeiro
+                    if (!prefixoInput.value) {
+                        prefixoInput.value = eletricistaSelecionados[0].prefixo;
+                    }
+                    btnAssociar.disabled = false;
+                } else {
+                    btnRegistrarAusencia.disabled = false;
                 }
-                
-                btnAssociar.disabled = false;
             }
         };
         
-        // Evento de mudança nos checkboxes
+        // ✅ CHECKBOXES
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const card = e.target.closest('.eletricista-card');
@@ -116,16 +194,13 @@ class RegistroV2 {
                 };
                 
                 if (e.target.checked) {
-                    // Adicionar se ainda não tiver 2
-                    if (eletricistaSelecionados.length < 2) {
+                    if (eletricistaSelecionados.length < limiteSelecao) {
                         eletricistaSelecionados.push(eletData);
                     } else {
-                        // Não deixar marcar mais de 2
                         e.target.checked = false;
                         return;
                     }
                 } else {
-                    // Remover da lista
                     eletricistaSelecionados = eletricistaSelecionados.filter(
                         elet => elet.id !== eletData.id
                     );
@@ -135,21 +210,69 @@ class RegistroV2 {
             });
         });
         
-        // Botão Associar
-        btnAssociar.addEventListener('click', () => {
-            if (eletricistaSelecionados.length === 0) return;
-            
-            const prefixo = prefixoInput.value.trim();
-            
-            if (!prefixo) {
-                alert('⚠️ Informe o prefixo da equipe!');
-                prefixoInput.focus();
-                return;
-            }
-            
-            // Adicionar CADA eletricista à lista temporária
-            eletricistaSelecionados.forEach(eletricista => {
-                // Verificar se já foi associado
+        // ✅ BOTÃO ASSOCIAR (PRESENÇA)
+        if (btnAssociar) {
+            btnAssociar.addEventListener('click', () => {
+                if (eletricistaSelecionados.length === 0) return;
+                
+                const prefixo = prefixoInput.value.trim();
+                
+                if (!prefixo) {
+                    alert('⚠️ Informe o prefixo da equipe!');
+                    prefixoInput.focus();
+                    return;
+                }
+                
+                // Adicionar à lista temporária (PRESENÇA)
+                eletricistaSelecionados.forEach(eletricista => {
+                    const jaAssociado = this.associacoesTemporarias.find(
+                        a => a.eletricista_id === eletricista.id
+                    );
+                    
+                    if (!jaAssociado) {
+                        this.associacoesTemporarias.push({
+                            eletricista_id: eletricista.id,
+                            nome: eletricista.nome,
+                            matricula: eletricista.matricula,
+                            prefixo: prefixo,
+                            tipo: 'presenca'  // ✅ Identifica como presença
+                        });
+                        
+                        const card = document.querySelector(`.eletricista-card[data-id="${eletricista.id}"]`);
+                        card.style.display = 'none';
+                    }
+                });
+                
+                // Limpar seleção
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                    cb.disabled = false;
+                    cb.closest('.eletricista-card').style.opacity = '1';
+                });
+                
+                eletricistaSelecionados = [];
+                atualizarInterface();
+                this.atualizarListaAssociacoes();
+            });
+        }
+        
+        // ✅ BOTÃO REGISTRAR AUSÊNCIA
+        if (btnRegistrarAusencia) {
+            btnRegistrarAusencia.addEventListener('click', () => {
+                if (eletricistaSelecionados.length === 0) return;
+                
+                const motivoId = motivoSelect.value;
+                const motivoTexto = motivoSelect.options[motivoSelect.selectedIndex]?.text;
+                
+                if (!motivoId) {
+                    alert('⚠️ Selecione o motivo da ausência!');
+                    motivoSelect.focus();
+                    return;
+                }
+                
+                // Adicionar à lista temporária (AUSÊNCIA)
+                const eletricista = eletricistaSelecionados[0];
+                
                 const jaAssociado = this.associacoesTemporarias.find(
                     a => a.eletricista_id === eletricista.id
                 );
@@ -159,28 +282,31 @@ class RegistroV2 {
                         eletricista_id: eletricista.id,
                         nome: eletricista.nome,
                         matricula: eletricista.matricula,
-                        prefixo: prefixo
+                        prefixo: '-',  // ✅ Sem prefixo para ausências
+                        tipo: 'ausencia',  // ✅ Identifica como ausência
+                        id_indisponibilidade: parseInt(motivoId),
+                        motivo_texto: motivoTexto
                     });
                     
-                    // Remover card da lista
                     const card = document.querySelector(`.eletricista-card[data-id="${eletricista.id}"]`);
                     card.style.display = 'none';
                 }
+                
+                // Limpar seleção
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                    cb.disabled = false;
+                    cb.closest('.eletricista-card').style.opacity = '1';
+                });
+                
+                eletricistaSelecionados = [];
+                motivoSelect.value = '';
+                atualizarInterface();
+                this.atualizarListaAssociacoes();
             });
-            
-            // Limpar seleção
-            checkboxes.forEach(cb => {
-                cb.checked = false;
-                cb.disabled = false;
-                cb.closest('.eletricista-card').style.opacity = '1';
-            });
-            
-            eletricistaSelecionados = [];
-            atualizarInterface();
-            
-            // Atualizar lista de associações
-            this.atualizarListaAssociacoes();
-        });
+        }
+        
+        // ✅ RESTO DO CÓDIGO (Salvar, Limpar) PERMANECE IGUAL
         
         // Botão Salvar Frequência        
         if (btnSalvarFrequencia) {
@@ -190,7 +316,7 @@ class RegistroV2 {
                     return;
                 }
                 
-                if (!confirm(`💾 Salvar ${this.associacoesTemporarias.length} associação(ões)?`)) {
+                if (!confirm(`💾 Salvar ${this.associacoesTemporarias.length} registro(s)?`)) {
                     return;
                 }
                 
@@ -198,10 +324,7 @@ class RegistroV2 {
                     btnSalvarFrequencia.disabled = true;
                     btnSalvarFrequencia.textContent = '⏳ Salvando...';
                     
-                    // Pegar data selecionada do campo
                     const dataRegistro = document.getElementById('data-registro').value;
-                    
-                    // ✅ GUARDAR CÓPIA DAS ASSOCIAÇÕES ANTES DE SALVAR
                     const associacoesSalvas = [...this.associacoesTemporarias];
                     
                     const response = await fetch('/api/salvar-frequencia', {
@@ -216,19 +339,10 @@ class RegistroV2 {
                     const result = await response.json();
                     
                     if (result.success) {
-                        // ✅ MOSTRAR LISTA DE SALVOS (NÃO RECARREGAR)
                         this.mostrarRegistrosSalvos(associacoesSalvas, result.data);
-                        
-                        // ✅ LIMPAR ASSOCIAÇÕES PENDENTES
                         this.associacoesTemporarias = [];
                         this.atualizarListaAssociacoes();
-                        
-                        // ✅ ESCONDER PAINEL DE PENDENTES
                         document.getElementById('associacoes-temporarias').style.display = 'none';
-                        
-                        // ✅ NÃO MOSTRAR OS CARDS NOVAMENTE!
-                        // Os eletricistas salvos ficam ocultos para não serem registrados novamente
-                        
                     } else {
                         alert(`❌ Erro: ${result.erro}`);
                     }
@@ -247,18 +361,17 @@ class RegistroV2 {
             btnLimparTodas.addEventListener('click', () => {
                 if (!confirm('🗑️ Limpar todas as associações pendentes?')) return;
                 
-                // Mostrar todos os cards novamente
                 document.querySelectorAll('.eletricista-card').forEach(card => {
                     card.style.display = 'block';
                 });
                 
-                // Limpar lista
                 this.associacoesTemporarias = [];
                 this.atualizarListaAssociacoes();
             });
         }
     }
     
+    ####
     atualizarListaAssociacoes() {
         const container = document.getElementById('associacoes-temporarias');
         const lista = document.getElementById('lista-associacoes');
@@ -270,29 +383,36 @@ class RegistroV2 {
         
         container.style.display = 'block';
         
-        lista.innerHTML = this.associacoesTemporarias.map((assoc, index) => `
-            <div class="associacao-item">
-                <div class="associacao-detalhes">
-                    <strong>${assoc.nome}</strong>
-                    <small>Mat: ${assoc.matricula} → Prefixo: ${assoc.prefixo}</small>
+        lista.innerHTML = this.associacoesTemporarias.map((assoc, index) => {
+            // ✅ MOSTRAR DIFERENTE PARA PRESENÇA E AUSÊNCIA
+            const detalhes = assoc.tipo === 'ausencia' 
+                ? `Mat: ${assoc.matricula} → <strong style="color: #dc3545;">AUSENTE</strong> (${assoc.motivo_texto})`
+                : `Mat: ${assoc.matricula} → Prefixo: ${assoc.prefixo}`;
+            
+            const cor = assoc.tipo === 'ausencia' ? '#fff3cd' : '#d1ecf1';
+            
+            return `
+                <div class="associacao-item" style="background: ${cor};">
+                    <div class="associacao-detalhes">
+                        <strong>${assoc.nome}</strong>
+                        <small>${detalhes}</small>
+                    </div>
+                    <button class="btn-remover-associacao" data-index="${index}">
+                        🗑️ Remover
+                    </button>
                 </div>
-                <button class="btn-remover-associacao" data-index="${index}">
-                    🗑️ Remover
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
-        // Adicionar eventos aos botões de remover
+        // Eventos de remover
         lista.querySelectorAll('.btn-remover-associacao').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const index = parseInt(e.target.dataset.index);
                 const assoc = this.associacoesTemporarias[index];
                 
-                // Mostrar card novamente
                 const card = document.querySelector(`.eletricista-card[data-id="${assoc.eletricista_id}"]`);
                 if (card) card.style.display = 'block';
                 
-                // Remover da lista
                 this.associacoesTemporarias.splice(index, 1);
                 this.atualizarListaAssociacoes();
             });
@@ -647,3 +767,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new RegistroV2();
     inicializarCalendario(); // Inicializar filtro de data
 });
+
