@@ -2462,37 +2462,6 @@ def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
         resultado["traceback"] = traceback.format_exc()
         return JSONResponse(resultado)
 
-# ==========================================
-# ROTA: BUSCAR MOTIVOS DE INDISPONIBILIDADE
-# ==========================================
-@app.get("/api/motivos-indisponibilidade")
-async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
-    """
-    Retorna lista de motivos EXCETO 'PRESENTE'
-    Para usar no select de ausência
-    """
-    try:
-        motivos = db.execute(
-            text("""
-                SELECT id, descricao 
-                FROM motivos_indisponibilidade 
-                WHERE ativo = true 
-                  AND UPPER(descricao) != 'PRESENTE'
-                ORDER BY descricao
-            """)
-        ).fetchall()
-        
-        return {
-            "success": True,
-            "motivos": [
-                {"id": m.id, "descricao": m.descricao} 
-                for m in motivos
-            ]
-        }
-        
-    except Exception as e:
-        logger.error(f"Erro ao buscar motivos: {str(e)}")
-        return {"success": False, "erro": str(e)}
 
 # ========================================
 # EXECUTAR SERVIDOR
@@ -2500,19 +2469,3 @@ async def buscar_motivos_indisponibilidade(db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
