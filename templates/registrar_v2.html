@@ -187,6 +187,7 @@
             </div>
         </div>
         
+        
         <!-- SEÇÃO INDISPONÍVEL -->
         <div id="secao-indisponivel" class="secao-operacao">
             <div style="background: white; border-radius: 10px; padding: 20px; border: 2px solid #ffc107;">
@@ -198,26 +199,27 @@
                     <!-- SELECT com eletricistas ausentes -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Eletricista: *</label>
-                        <select id="select-eletricista-ausente" name="eletricista_id" 
+                        <select id="select-eletricista-ausente" name="eletricista_id" required
                                 style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
                             <option value="">-- Selecione o eletricista --</option>
                             {% for elet in eletricistas_ausentes %}
                             <option value="{{ elet.id }}" 
                                     data-prefixo="{{ elet.prefixo }}"
-                                    data-nome="{{ elet.nome }}">
+                                    data-nome="{{ elet.nome }}"
+                                    data-matricula="{{ elet.matricula }}"
+                                    data-motivo="{{ elet.motivo_ausencia }}">
                                 {{ elet.nome }} ({{ elet.matricula }}) - {{ elet.motivo_ausencia }}
                             </option>
                             {% endfor %}
                         </select>
                     </div>
                     
-                    <!-- Prefixo (preenchido automaticamente) -->
+                    <!-- Prefixo (preenchido automaticamente, mas EDITÁVEL) -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Prefixo: *</label>
-                        <input type="text" id="prefixo-indisponivel" name="prefixo"
+                        <input type="text" id="prefixo-indisponivel" name="prefixo" required
                                style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px; box-sizing: border-box;"
-                               placeholder="Preenchido automaticamente">
-                        <input type="hidden" id="eletricista-id-indisponivel" name="eletricista_id_hidden">
+                               placeholder="Preenchido automaticamente (editável)">
                     </div>
                     
                     <!-- Tipo de Indisponibilidade -->
@@ -227,32 +229,32 @@
                         </label>
                         <div style="display: flex; gap: 15px;">
                             <label style="flex: 1; cursor: pointer;">
+                                <input type="radio" name="tipo_indisponibilidade" value="parcial" 
+                                       id="radio-parcial" style="display: none;">
                                 <div class="tipo-indisp-card" id="card-parcial"
-                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center;">
+                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center; transition: all 0.3s;">
                                     <div style="font-size: 30px;">⏱️</div>
                                     <strong>Parcial</strong>
-                                    <div style="font-size: 12px; color: #666;">Apenas um turno</div>
+                                    <div style="font-size: 12px; color: #666;">Apenas um turno (manhã ou tarde)</div>
                                 </div>
-                                <input type="radio" name="tipo_indisponibilidade" value="parcial" 
-                                       style="display: none;" id="radio-parcial">
                             </label>
                             <label style="flex: 1; cursor: pointer;">
+                                <input type="radio" name="tipo_indisponibilidade" value="total" 
+                                       id="radio-total" style="display: none;">
                                 <div class="tipo-indisp-card" id="card-total"
-                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center;">
-                                    <div style="font-size: 30px;">⏱️</div>
+                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center; transition: all 0.3s;">
+                                    <div style="font-size: 30px;">🚫</div>
                                     <strong>Total</strong>
                                     <div style="font-size: 12px; color: #666;">O dia inteiro</div>
                                 </div>
-                                <input type="radio" name="tipo_indisponibilidade" value="total" 
-                                       style="display: none;" id="radio-total">
                             </label>
                         </div>
                     </div>
                     
-                    <!-- Motivo -->
+                    <!-- Motivo (preenchido automaticamente) -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Motivo: *</label>
-                        <select name="motivo_id" 
+                        <select id="select-motivo-indisponivel" name="motivo_id" required
                                 style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
                             <option value="">-- Selecione --</option>
                             {% for motivo in motivos %}
@@ -271,7 +273,10 @@
                                   placeholder="Informações adicionais..."></textarea>
                     </div>
                     
-                    <button type="submit" 
+                    <!-- Hidden field para data -->
+                    <input type="hidden" name="data" value="{{ data_selecionada }}">
+                    
+                    <button type="submit" id="btn-registrar-indisponibilidade"
                             style="width: 100%; padding: 15px; background: #ffc107; color: #212529; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
                         ⚠️ Registrar Indisponibilidade
                     </button>
@@ -298,5 +303,6 @@
         
 </body>
 </html>
+
 
 
