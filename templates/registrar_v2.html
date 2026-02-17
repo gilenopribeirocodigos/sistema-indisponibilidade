@@ -186,97 +186,104 @@
                 <div id="resultado-busca-remanejar" class="resultado-busca"></div>
             </div>
         </div>
-
+        
         <!-- SEÇÃO INDISPONÍVEL -->
         <div id="secao-indisponivel" class="secao-operacao">
-            <div class="form-section">
-                <h3>⚠️ Registrar Indisponibilidade</h3>
-                <p class="section-subtitle">
-                    Registre um eletricista e prefixo como indisponível
-                </p>
+            <div style="background: white; border-radius: 10px; padding: 20px; border: 2px solid #ffc107;">
+                <h4>⚠️ Registrar Indisponibilidade</h4>
+                <p style="color: #666;">Eletricistas registrados como ausentes hoje:</p>
                 
+                {% if eletricistas_ausentes %}
                 <form id="form-indisponivel">
-                    <div class="form-group">
-                        <label for="eletricista-indisponivel">Eletricista: *</label>
-                        <input 
-                            type="text" 
-                            id="eletricista-indisponivel"
-                            name="eletricista"
-                            placeholder="Digite o nome..."
-                            autocomplete="off"
-                            required
-                        >
-                        <input type="hidden" id="eletricista-id-indisponivel" name="eletricista_id">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="prefixo-indisponivel">Prefixo: *</label>
-                        <input 
-                            type="text" 
-                            id="prefixo-indisponivel"
-                            name="prefixo"
-                            placeholder="Ex: PI-AGB-C001M"
-                            required
-                        >
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Tipo de Indisponibilidade: *</label>
-                        <div class="tipo-indisponibilidade-group">
-                            <label class="radio-option">
-                                <input 
-                                    type="radio" 
-                                    name="tipo_indisponibilidade" 
-                                    value="parcial" 
-                                    required
-                                >
-                                <span class="radio-label">
-                                    <span class="radio-icon">🕐</span>
-                                    <strong>Parcial</strong>
-                                    <small>Apenas um turno (manhã ou tarde)</small>
-                                </span>
-                            </label>
-                            
-                            <label class="radio-option">
-                                <input 
-                                    type="radio" 
-                                    name="tipo_indisponibilidade" 
-                                    value="total" 
-                                    required
-                                >
-                                <span class="radio-label">
-                                    <span class="radio-icon">🕛</span>
-                                    <strong>Total</strong>
-                                    <small>O dia inteiro</small>
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="motivo-indisponivel">Motivo: *</label>
-                        <select id="motivo-indisponivel" name="motivo_id" required>
-                            <option value="">Selecione o motivo...</option>
-                            {% for motivo in motivos %}
-                            <option value="{{ motivo.id }}">{{ motivo.descricao }}</option>
+                    <!-- SELECT com eletricistas ausentes -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold;">Eletricista: *</label>
+                        <select id="select-eletricista-ausente" name="eletricista_id" 
+                                style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
+                            <option value="">-- Selecione o eletricista --</option>
+                            {% for elet in eletricistas_ausentes %}
+                            <option value="{{ elet.id }}" 
+                                    data-prefixo="{{ elet.prefixo }}"
+                                    data-nome="{{ elet.nome }}">
+                                {{ elet.nome }} ({{ elet.matricula }}) - {{ elet.motivo_ausencia }}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="observacoes-indisponivel">Observações:</label>
-                        <textarea 
-                            id="observacoes-indisponivel"
-                            name="observacoes" 
-                            rows="3"
-                            placeholder="Informações adicionais..."
-                        ></textarea>
+                    <!-- Prefixo (preenchido automaticamente) -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold;">Prefixo: *</label>
+                        <input type="text" id="prefixo-indisponivel" name="prefixo"
+                               style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px; box-sizing: border-box;"
+                               placeholder="Preenchido automaticamente">
+                        <input type="hidden" id="eletricista-id-indisponivel" name="eletricista_id_hidden">
                     </div>
                     
-                    <button type="submit" class="btn btn-primary btn-lg">
+                    <!-- Tipo de Indisponibilidade -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 10px;">
+                            Tipo de Indisponibilidade: *
+                        </label>
+                        <div style="display: flex; gap: 15px;">
+                            <label style="flex: 1; cursor: pointer;">
+                                <div class="tipo-indisp-card" id="card-parcial"
+                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center;">
+                                    <div style="font-size: 30px;">⏱️</div>
+                                    <strong>Parcial</strong>
+                                    <div style="font-size: 12px; color: #666;">Apenas um turno</div>
+                                </div>
+                                <input type="radio" name="tipo_indisponibilidade" value="parcial" 
+                                       style="display: none;" id="radio-parcial">
+                            </label>
+                            <label style="flex: 1; cursor: pointer;">
+                                <div class="tipo-indisp-card" id="card-total"
+                                     style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center;">
+                                    <div style="font-size: 30px;">⏱️</div>
+                                    <strong>Total</strong>
+                                    <div style="font-size: 12px; color: #666;">O dia inteiro</div>
+                                </div>
+                                <input type="radio" name="tipo_indisponibilidade" value="total" 
+                                       style="display: none;" id="radio-total">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Motivo -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold;">Motivo: *</label>
+                        <select name="motivo_id" 
+                                style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
+                            <option value="">-- Selecione --</option>
+                            {% for motivo in motivos %}
+                            {% if motivo.descricao|upper != 'PRESENTE' %}
+                            <option value="{{ motivo.id }}">{{ motivo.descricao }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Observações -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: bold;">Observações:</label>
+                        <textarea name="observacoes" rows="3"
+                                  style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px; box-sizing: border-box;"
+                                  placeholder="Informações adicionais..."></textarea>
+                    </div>
+                    
+                    <button type="submit" 
+                            style="width: 100%; padding: 15px; background: #ffc107; color: #212529; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
                         ⚠️ Registrar Indisponibilidade
                     </button>
                 </form>
+                
+                {% else %}
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <div style="font-size: 48px;">✅</div>
+                    <p>Nenhum eletricista ausente registrado hoje.</p>
+                    <p style="font-size: 14px;">Registre ausências na seção <strong>Frequência → Ausência</strong></p>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -291,4 +298,5 @@
         
 </body>
 </html>
+
 
