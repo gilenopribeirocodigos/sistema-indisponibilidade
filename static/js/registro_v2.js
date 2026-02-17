@@ -688,52 +688,100 @@ class RegistroV2 {
         
         const selectEletricista = document.getElementById('select-eletricista-ausente');
         const prefixoInput = document.getElementById('prefixo-indisponivel');
+        const selectMotivo = document.getElementById('select-motivo-indisponivel');
         
-        // ✅ PREENCHER PREFIXO AUTOMATICAMENTE AO SELECIONAR ELETRICISTA
+        // ✅ FIX 1: PREENCHER PREFIXO E MOTIVO AUTOMATICAMENTE
         if (selectEletricista) {
             selectEletricista.addEventListener('change', () => {
                 const option = selectEletricista.options[selectEletricista.selectedIndex];
+                
                 if (option && option.value) {
+                    // Preencher prefixo (editável)
                     prefixoInput.value = option.dataset.prefixo || '';
+                    
+                    // Preencher motivo automaticamente
+                    const motivoTexto = option.dataset.motivo || '';
+                    console.log('Motivo do eletricista:', motivoTexto);
+                    
+                    // Buscar a opção correspondente no select
+                    for (let i = 0; i < selectMotivo.options.length; i++) {
+                        const optMotivo = selectMotivo.options[i];
+                        if (optMotivo.text.toUpperCase() === motivoTexto.toUpperCase()) {
+                            selectMotivo.selectedIndex = i;
+                            console.log('✅ Motivo selecionado automaticamente:', optMotivo.text);
+                            break;
+                        }
+                    }
                 } else {
                     prefixoInput.value = '';
+                    selectMotivo.selectedIndex = 0;
                 }
             });
         }
         
-        // ✅ CARDS DE TIPO (PARCIAL/TOTAL)
-        document.querySelectorAll('.tipo-indisp-card').forEach(card => {
-            card.parentElement.addEventListener('click', () => {
-                // Remover seleção de todos
-                document.querySelectorAll('.tipo-indisp-card').forEach(c => {
-                    c.style.borderColor = '#dee2e6';
-                    c.style.background = 'white';
-                });
-                
-                // Selecionar atual
-                card.style.borderColor = '#ffc107';
-                card.style.background = '#fff9e6';
-                
-                // Marcar radio
-                const radioId = card.id.replace('card-', 'radio-');
-                const radio = document.getElementById(radioId);
-                if (radio) radio.checked = true;
-            });
-        });
+        // ✅ FIX 2: CARDS DE TIPO (PARCIAL/TOTAL) - FUNCIONANDO
+        const cardParcial = document.getElementById('card-parcial');
+        const cardTotal = document.getElementById('card-total');
+        const radioParcial = document.getElementById('radio-parcial');
+        const radioTotal = document.getElementById('radio-total');
         
-        // ✅ SUBMIT DO FORM
+        if (cardParcial && cardTotal) {
+            // Função para selecionar card
+            const selecionarCard = (cardSelecionado, radioSelecionado, cardDesmarcado) => {
+                // Desmarcar todos
+                cardParcial.style.borderColor = '#dee2e6';
+                cardParcial.style.background = 'white';
+                cardTotal.style.borderColor = '#dee2e6';
+                cardTotal.style.background = 'white';
+                radioParcial.checked = false;
+                radioTotal.checked = false;
+                
+                // Marcar selecionado
+                cardSelecionado.style.borderColor = '#ffc107';
+                cardSelecionado.style.background = '#fff9e6';
+                radioSelecionado.checked = true;
+                
+                console.log('✅ Tipo selecionado:', radioSelecionado.value);
+            };
+            
+            // Event listeners
+            cardParcial.addEventListener('click', () => {
+                selecionarCard(cardParcial, radioParcial, cardTotal);
+            });
+            
+            cardTotal.addEventListener('click', () => {
+                selecionarCard(cardTotal, radioTotal, cardParcial);
+            });
+        }
+        
+        // ✅ FIX 3 e 4: SUBMIT DO FORM (BOTÃO ATIVO)
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const eletricista_id = selectEletricista?.value;
+            const prefixo = prefixoInput?.value;
+            const tipo = form.querySelector('input[name="tipo_indisponibilidade"]:checked');
+            const motivo_id = selectMotivo?.value;
+            
+            // Validações
             if (!eletricista_id) {
                 alert('⚠️ Selecione um eletricista!');
                 return;
             }
             
-            const tipoChecked = form.querySelector('input[name="tipo_indisponibilidade"]:checked');
-            if (!tipoChecked) {
+            if (!prefixo || prefixo.trim() === '') {
+                alert('⚠️ Informe o prefixo!');
+                prefixoInput.focus();
+                return;
+            }
+            
+            if (!tipo) {
                 alert('⚠️ Selecione o tipo de indisponibilidade (Parcial ou Total)!');
+                return;
+            }
+            
+            if (!motivo_id) {
+                alert('⚠️ Selecione o motivo!');
                 return;
             }
             
@@ -743,13 +791,9 @@ class RegistroV2 {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.disabled = true;
                 submitBtn.textContent = '⏳ Salvando...';
+                submitBtn.style.background = '#ccc';
                 
                 const formData = new FormData(form);
-                // Garantir que o eletricista_id correto é enviado
-                formData.set('eletricista_id', eletricista_id);
-                
-                const dataRegistro = document.querySelector('input[name="data"]').value;
-                formData.set('data', dataRegistro);
                 
                 const response = await fetch('/api/salvar-indisponibilidade', {
                     method: 'POST',
@@ -759,18 +803,21 @@ class RegistroV2 {
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('✅ Indisponibilidade registrada com sucesso!');
+                    alert(`✅ ${result.mensagem}`);
                     window.location.reload();
                 } else {
                     alert(`❌ Erro: ${result.erro}`);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '⚠️ Registrar Indisponibilidade';
+                    submitBtn.style.background = '#ffc107';
                 }
             } catch (error) {
                 alert('❌ Erro ao salvar: ' + error.message);
-            } finally {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.textContent = '⚠️ Registrar Indisponibilidade';
+                    submitBtn.style.background = '#ffc107';
                 }
             }
         });
@@ -923,4 +970,5 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
