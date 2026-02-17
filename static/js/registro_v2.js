@@ -684,21 +684,56 @@ class RegistroV2 {
     // ==========================================
     setupIndisponivel() {
         const form = document.getElementById('form-indisponivel');
-        const inputEletricista = document.getElementById('eletricista-indisponivel');
-        const inputEletricstaId = document.getElementById('eletricista-id-indisponivel');
+        if (!form) return;
         
-        if (!form || !inputEletricista) return;
+        const selectEletricista = document.getElementById('select-eletricista-ausente');
+        const prefixoInput = document.getElementById('prefixo-indisponivel');
         
-        new AutocompleteIndisponivel(inputEletricista, inputEletricstaId);
+        // ✅ PREENCHER PREFIXO AUTOMATICAMENTE AO SELECIONAR ELETRICISTA
+        if (selectEletricista) {
+            selectEletricista.addEventListener('change', () => {
+                const option = selectEletricista.options[selectEletricista.selectedIndex];
+                if (option && option.value) {
+                    prefixoInput.value = option.dataset.prefixo || '';
+                } else {
+                    prefixoInput.value = '';
+                }
+            });
+        }
         
+        // ✅ CARDS DE TIPO (PARCIAL/TOTAL)
+        document.querySelectorAll('.tipo-indisp-card').forEach(card => {
+            card.parentElement.addEventListener('click', () => {
+                // Remover seleção de todos
+                document.querySelectorAll('.tipo-indisp-card').forEach(c => {
+                    c.style.borderColor = '#dee2e6';
+                    c.style.background = 'white';
+                });
+                
+                // Selecionar atual
+                card.style.borderColor = '#ffc107';
+                card.style.background = '#fff9e6';
+                
+                // Marcar radio
+                const radioId = card.id.replace('card-', 'radio-');
+                const radio = document.getElementById(radioId);
+                if (radio) radio.checked = true;
+            });
+        });
+        
+        // ✅ SUBMIT DO FORM
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const formData = new FormData(form);
-            const eletricstaId = inputEletricstaId.value;
+            const eletricista_id = selectEletricista?.value;
+            if (!eletricista_id) {
+                alert('⚠️ Selecione um eletricista!');
+                return;
+            }
             
-            if (!eletricstaId) {
-                alert('⚠️ Selecione um eletricista da lista!');
+            const tipoChecked = form.querySelector('input[name="tipo_indisponibilidade"]:checked');
+            if (!tipoChecked) {
+                alert('⚠️ Selecione o tipo de indisponibilidade (Parcial ou Total)!');
                 return;
             }
             
@@ -709,8 +744,12 @@ class RegistroV2 {
                 submitBtn.disabled = true;
                 submitBtn.textContent = '⏳ Salvando...';
                 
+                const formData = new FormData(form);
+                // Garantir que o eletricista_id correto é enviado
+                formData.set('eletricista_id', eletricista_id);
+                
                 const dataRegistro = document.querySelector('input[name="data"]').value;
-                formData.append('data', dataRegistro);
+                formData.set('data', dataRegistro);
                 
                 const response = await fetch('/api/salvar-indisponibilidade', {
                     method: 'POST',
@@ -727,10 +766,18 @@ class RegistroV2 {
                 }
             } catch (error) {
                 alert('❌ Erro ao salvar: ' + error.message);
+            } finally {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '⚠️ Registrar Indisponibilidade';
+                }
             }
         });
     }
-}
+
+
+} //ver se esta chave fica
 
 // ==========================================
 // AUTOCOMPLETE PARA INDISPONÍVEL
@@ -876,3 +923,4 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
