@@ -1161,6 +1161,154 @@ def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
     return JSONResponse({"prefixos": resultado})
 
 
+# ==========================================
+# API: BUSCAR REGISTRO PARA DESFAZER
+# ==========================================
+@app.get("/api/buscar-registro-para-desfazer")
+async def buscar_registro_para_desfazer(
+    request: Request,
+    matricula: str,
+    data: str,
+    db: Session = Depends(get_db)
+):
+    """Busca registro de hoje para desfazer"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    from models import EquipeDia, EstruturaEquipes, MotivoIndisponibilidade
+    
+    try:
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data, '%Y-%m-%d').date()
+        except:
+            return JSONResponse({"success": False, "erro": "Data inválida"})
+        
+        # Buscar eletricista pela matrícula
+        eletricista = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.matricula == matricula.strip()
+        ).first()
+        
+        if not eletricista:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ Matrícula {matricula} não encontrada!"
+            })
+        
+        # Buscar registro na tabela equipes_dia
+        registro = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista.id,
+            EquipeDia.data == data_obj
+        ).first()
+        
+        if not registro:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ {eletricista.colaborador} não tem registro para {data_obj.strftime('%d/%m/%Y')}!"
+            })
+        
+        # Buscar motivo
+        motivo = db.query(MotivoIndisponibilidade).filter(
+            MotivoIndisponibilidade.id == registro.id_indisponibilidade
+        ).first()
+        
+        # Determinar tipo (presença ou ausência)
+        # Assumindo que id = 15 é "PRESENTE"
+        tipo = 'presenca' if registro.id_indisponibilidade == 15 else 'ausencia'
+        
+        return JSONResponse({
+            "success": True,
+            "eletricista": {
+                "id": eletricista.id,
+                "nome": eletricista.colaborador,
+                "matricula": eletricista.matricula,
+                "prefixo": registro.prefixo
+            },
+            "tipo": tipo,
+            "motivo": motivo.descricao if motivo else "N/A",
+            "data": data_obj.strftime('%d/%m/%Y'),
+            "registro_id": registro.id
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
+
+# ==========================================
+# API: DESFAZER REGISTRO
+# ==========================================
+@app.post("/api/desfazer-registro")
+async def desfazer_registro(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Remove registro de equipes_dia para permitir novo lançamento"""
+    
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EquipeDia, EstruturaEquipes
+    
+    try:
+        dados = await request.json()
+        matricula = dados.get('matricula')
+        data_str = dados.get('data')
+        
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except:
+            return JSONResponse({"success": False, "erro": "Data inválida"})
+        
+        # Buscar eletricista
+        eletricista = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.matricula == matricula.strip()
+        ).first()
+        
+        if not eletricista:
+            return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
+        
+        # Buscar e DELETAR registro
+        registro = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista.id,
+            EquipeDia.data == data_obj
+        ).first()
+        
+        if not registro:
+            return JSONResponse({
+                "success": False,
+                "erro": f"{eletricista.colaborador} não tem registro para esta data"
+            })
+        
+        # ✅ DELETAR REGISTRO
+        db.delete(registro)
+        db.commit()
+        
+        logger.info(f"🔄 Registro desfeito: {eletricista.colaborador} - Data: {data_obj}")
+        
+        return JSONResponse({
+            "success": True,
+            "mensagem": f"Registro de {eletricista.colaborador} removido com sucesso!"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Erro ao desfazer registro: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
+
 # [CONTINUAR COM TODAS AS OUTRAS ROTAS DO SEU ARQUIVO ORIGINAL...]
 # (Gestão de usuários, relatórios, importação CSV, etc.)
 
@@ -1170,6 +1318,7 @@ def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
 
 
 
