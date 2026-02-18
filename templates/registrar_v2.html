@@ -185,7 +185,7 @@
                 
                 <div id="resultado-busca-remanejar" class="resultado-busca"></div>
             </div>
-        </div>
+        </div>      
         
         
         <!-- SEÇÃO INDISPONÍVEL -->
@@ -195,11 +195,11 @@
                 <p style="color: #666;">Eletricistas registrados como ausentes hoje:</p>
                 
                 {% if eletricistas_ausentes %}
-                <form id="form-indisponivel">
+                <div style="margin-bottom: 20px;">
                     <!-- SELECT com eletricistas ausentes -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Eletricista: *</label>
-                        <select id="select-eletricista-ausente" name="eletricista_id" required
+                        <select id="select-eletricista-ausente"
                                 style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
                             <option value="">-- Selecione o eletricista --</option>
                             {% for elet in eletricistas_ausentes %}
@@ -217,7 +217,7 @@
                     <!-- Prefixo (preenchido automaticamente, mas EDITÁVEL) -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Prefixo: *</label>
-                        <input type="text" id="prefixo-indisponivel" name="prefixo" required
+                        <input type="text" id="prefixo-indisponivel"
                                style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px; box-sizing: border-box;"
                                placeholder="Preenchido automaticamente (editável)">
                     </div>
@@ -229,7 +229,7 @@
                         </label>
                         <div style="display: flex; gap: 15px;">
                             <label style="flex: 1; cursor: pointer;">
-                                <input type="radio" name="tipo_indisponibilidade" value="parcial" 
+                                <input type="radio" name="tipo_indisponibilidade_temp" value="parcial" 
                                        id="radio-parcial" style="display: none;">
                                 <div class="tipo-indisp-card" id="card-parcial"
                                      style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center; transition: all 0.3s;">
@@ -239,7 +239,7 @@
                                 </div>
                             </label>
                             <label style="flex: 1; cursor: pointer;">
-                                <input type="radio" name="tipo_indisponibilidade" value="total" 
+                                <input type="radio" name="tipo_indisponibilidade_temp" value="total" 
                                        id="radio-total" style="display: none;">
                                 <div class="tipo-indisp-card" id="card-total"
                                      style="border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; text-align: center; transition: all 0.3s;">
@@ -254,7 +254,7 @@
                     <!-- Motivo (preenchido automaticamente) -->
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Motivo: *</label>
-                        <select id="select-motivo-indisponivel" name="motivo_id" required
+                        <select id="select-motivo-indisponivel"
                                 style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px;">
                             <option value="">-- Selecione --</option>
                             {% for motivo in motivos %}
@@ -266,21 +266,38 @@
                     </div>
                     
                     <!-- Observações -->
-                    <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Observações:</label>
-                        <textarea name="observacoes" rows="3"
+                        <textarea id="observacoes-indisponivel" rows="3"
                                   style="width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 2px solid #dee2e6; border-radius: 5px; box-sizing: border-box;"
                                   placeholder="Informações adicionais..."></textarea>
                     </div>
                     
-                    <!-- Hidden field para data -->
-                    <input type="hidden" name="data" value="{{ data_selecionada }}">
-                    
-                    <button type="submit" id="btn-registrar-indisponibilidade"
-                            style="width: 100%; padding: 15px; background: #ffc107; color: #212529; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
-                        ⚠️ Registrar Indisponibilidade
+                    <!-- Botão VERDE igual ao da frequência -->
+                    <button id="btn-adicionar-indisponibilidade"
+                            style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                        ➕ Adicionar à Lista
                     </button>
-                </form>
+                </div>
+                
+                <!-- PAINEL DE ASSOCIAÇÕES PENDENTES (igual ao da frequência) -->
+                <div id="painel-indisponibilidades-pendentes" style="display: none; margin-top: 20px;">
+                    <h5 style="color: #ffc107; margin-bottom: 10px;">⚠️ Indisponibilidades Pendentes de Salvamento</h5>
+                    <div id="lista-indisponibilidades-pendentes" style="background: #fff9e6; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <!-- Preenchido dinamicamente -->
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-limpar-indisponibilidades" 
+                                style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                            🗑️ Limpar Todas
+                        </button>
+                        <button id="btn-salvar-indisponibilidades"
+                                style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;">
+                            💾 Salvar Todas as Indisponibilidades
+                        </button>
+                    </div>
+                </div>
                 
                 {% else %}
                 <div style="text-align: center; padding: 40px; color: #666;">
@@ -291,7 +308,8 @@
                 {% endif %}
             </div>
         </div>
-
+        
+        //A PARTIR DAQUI É RODAPÉ - NÃO TEM NADA A VER COM INDISPONIBILIDADE
         <!-- Rodapé -->
         <div class="footer-registro">
             <p>Sistema de Indisponibilidade - DPL Construções | Equatorial Energia</p>
@@ -303,6 +321,7 @@
         
 </body>
 </html>
+
 
 
 
