@@ -15,6 +15,7 @@ class RegistroV2 {
         this.setupFrequencia();
         this.setupRemanejado();
         this.setupIndisponivel();
+        this.setupDesfazerRegistro(); // ← ADICIONAR AQUI
     }
     
     // ==========================================
@@ -1259,6 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
 
 
