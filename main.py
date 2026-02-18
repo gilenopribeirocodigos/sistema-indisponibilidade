@@ -452,7 +452,9 @@ def registrar_v2_page(
     # Converter de volta para lista
     ids_ja_registrados = list(ids_ja_registrados)
     
+    
     # ✅ BUSCAR ELETRICISTAS AUSENTES (para seção Indisponível)
+    # EXCLUINDO os que já foram registrados na tabela indisponibilidade
     eletricistas_ausentes = db.execute(
         text("""
             SELECT 
@@ -465,13 +467,18 @@ def registrar_v2_page(
             FROM equipes_dia ed
             JOIN estrutura_equipes ee ON ed.eletricista_id = ee.id
             JOIN motivos_indisponibilidade mi ON ed.id_indisponibilidade = mi.id
+            LEFT JOIN indisponibilidade indisp ON (
+                indisp.eletricista_id = ed.eletricista_id 
+                AND indisp.data = ed.data
+            )
             WHERE ed.data = :data
               AND ed.id_indisponibilidade != 15
+              AND indisp.id IS NULL
             ORDER BY ee.colaborador
         """),
         {"data": data_selecionada}
     ).fetchall()
-    
+       
     eletricistas_ausentes_lista = [
         {
             "id": e.eletricista_id,
@@ -1161,3 +1168,4 @@ def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
+
