@@ -981,6 +981,82 @@ class RegistroV2 {
         
         console.log('✅ setupIndisponivel concluído!');
     }
+
+    // ========================================
+    // FUNÇÃO DESFAZER REGISTRO
+    // ========================================
+    setupDesfazerRegistro() {
+        const btnDesfazer = document.getElementById('btn-desfazer-registro');
+        if (!btnDesfazer) return;
+        
+        btnDesfazer.addEventListener('click', async () => {
+            // ✅ PASSO 1: Pedir matrícula
+            const matricula = prompt('🔢 Digite a MATRÍCULA do eletricista para desfazer o registro de HOJE:');
+            
+            if (!matricula || matricula.trim() === '') {
+                return; // Cancelou
+            }
+            
+            try {
+                // ✅ PASSO 2: Buscar registro no backend
+                const dataInput = document.querySelector('input[name="data"]');
+                const data = dataInput ? dataInput.value : new Date().toISOString().split('T')[0];
+                
+                const response = await fetch(`/api/buscar-registro-para-desfazer?matricula=${encodeURIComponent(matricula.trim())}&data=${data}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    alert(`❌ ${result.erro}`);
+                    return;
+                }
+                
+                // ✅ PASSO 3: Mostrar confirmação com nome do eletricista
+                const eletricista = result.eletricista;
+                const tipoTexto = result.tipo === 'presenca' ? 'PRESENÇA' : 'AUSÊNCIA';
+                const motivoTexto = result.motivo || 'N/A';
+                
+                const confirmacao = confirm(
+                    `🔄 DESFAZER REGISTRO?\n\n` +
+                    `Eletricista: ${eletricista.nome}\n` +
+                    `Matrícula: ${eletricista.matricula}\n` +
+                    `Prefixo: ${eletricista.prefixo}\n` +
+                    `Tipo: ${tipoTexto}\n` +
+                    `Motivo: ${motivoTexto}\n` +
+                    `Data: ${result.data}\n\n` +
+                    `⚠️ Esta ação irá REMOVER este registro e o eletricista voltará para a lista!\n\n` +
+                    `Confirmar?`
+                );
+                
+                if (!confirmacao) {
+                    return; // Cancelou
+                }
+                
+                // ✅ PASSO 4: Desfazer registro
+                const responseDesfazer = await fetch('/api/desfazer-registro', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        matricula: matricula.trim(),
+                        data: data
+                    })
+                });
+                
+                const resultDesfazer = await responseDesfazer.json();
+                
+                if (resultDesfazer.success) {
+                    alert(`✅ Registro desfeito com sucesso!\n\n${eletricista.nome} voltará a aparecer na lista.`);
+                    window.location.reload(); // Recarregar página
+                } else {
+                    alert(`❌ Erro ao desfazer: ${resultDesfazer.erro}`);
+                }
+                
+            } catch (error) {
+                alert(`❌ Erro: ${error.message}`);
+            }
+        });
+    }
     
     // ========================================
     // FUNÇÃO AUXILIAR: ATUALIZAR PAINEL
@@ -1183,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     registroV2 = new RegistroV2();
     inicializarCalendario();
 });
+
 
 
 
