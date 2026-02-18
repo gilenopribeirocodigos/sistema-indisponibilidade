@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Date, Text, ForeignKey,
 from sqlalchemy.sql import func
 from database import Base
 from datetime import datetime
+from sqlalchemy.orm import relationship
 
 # ============================================
 # CLASSE: EstruturaEquipes (PRINCIPAL)
@@ -158,4 +159,5 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
 
