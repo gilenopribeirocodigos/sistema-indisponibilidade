@@ -123,14 +123,9 @@ class EquipeDia(Base):
     data = Column(Date, nullable=False)
     supervisor_registro = Column(String, nullable=False)
     usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
-    id_indisponibilidade = Column(Integer, ForeignKey("motivos_indisponibilidade.id"))  # ← NOVA COLUNA
+    id_indisponibilidade = Column(Integer, ForeignKey("motivos_indisponibilidade.id"))
     criado_em = Column(DateTime, server_default=func.now())
     observacoes = Column(Text)
-    
-    # Relacionamentos
-    eletricista = relationship("EstruturaEquipes", back_populates="equipes_dia")
-    usuario = relationship("Usuario")
-    motivo = relationship("MotivoIndisponibilidade")  # ← RELACIONAMENTO COM MOTIVO
 
 
 # ============================================
@@ -159,5 +154,6 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
 
 
