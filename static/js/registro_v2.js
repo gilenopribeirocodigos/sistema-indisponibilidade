@@ -5,6 +5,8 @@
 class RegistroV2 {
     constructor() {
         this.associacoesTemporarias = [];
+        this.motivosDisponiveis = [];
+        this.motivosCarregados = false;
         this.init();
     }
     
@@ -13,6 +15,7 @@ class RegistroV2 {
         this.setupFrequencia();
         this.setupRemanejado();
         this.setupIndisponivel();
+        this.setupDesfazerRegistro(); // ← ADICIONAR AQUI
     }
     
     // ==========================================
@@ -35,177 +38,450 @@ class RegistroV2 {
                 document.getElementById(`secao-${tipo}`).classList.add('active');
             });
         });
-    }
+    }    
     
     // ==========================================
-    // SEÇÃO 1: FREQUÊNCIA - ATÉ 2 SELEÇÕES
+    // SEÇÃO 1: FREQUÊNCIA - PRESENÇA/AUSÊNCIA
     // ==========================================
     setupFrequencia() {
-        const checkboxes = document.querySelectorAll('.eletricista-checkbox');
-        const eletricistagInfo = document.getElementById('eletricista-info');
-        const contadorSelecao = document.getElementById('contador-selecao');
-        const prefixoInput = document.getElementById('prefixo-frequencia');
-        const btnAssociar = document.getElementById('btn-associar');
-        const btnSalvarFrequencia = document.getElementById('btn-salvar-frequencia');
+        const checkboxes = document.querySelectorAll('.checkbox-eletricista');
         const btnLimparTodas = document.getElementById('btn-limpar-todas');
         
-        let eletricistaSelecionados = []; // Array para até 2 eletricistas
+        let eletricistasIntermediarios = [];
+        let modoAtual = 'presenca';
         
-        // Função para atualizar interface
-        const atualizarInterface = () => {
-            const qtdSelecionados = eletricistaSelecionados.length;
-            
-            // Atualizar contador
-            contadorSelecao.textContent = `${qtdSelecionados}/2`;
-            contadorSelecao.className = 'contador-badge';
-            if (qtdSelecionados === 2) {
-                contadorSelecao.classList.add('contador-completo');
-            } else if (qtdSelecionados === 1) {
-                contadorSelecao.classList.add('contador-parcial');
-            }
-            
-            // Desabilitar outros checkboxes se já tiver 2 selecionados
-            checkboxes.forEach(cb => {
-                if (!cb.checked && qtdSelecionados >= 2) {
-                    cb.disabled = true;
-                    cb.closest('.eletricista-card').style.opacity = '0.5';
-                } else if (!cb.checked) {
-                    cb.disabled = false;
-                    cb.closest('.eletricista-card').style.opacity = '1';
-                }
-            });
-            
-            // Atualizar painel de informações
-            if (qtdSelecionados === 0) {
-                eletricistagInfo.innerHTML = 'Selecione até 2 eletricistas acima';
-                eletricistagInfo.classList.remove('info-preenchida');
-                eletricistagInfo.classList.add('info-vazia');
-                prefixoInput.value = '';
-                btnAssociar.disabled = true;
-            } else {
-                const htmlEletricistas = eletricistaSelecionados.map((elet, index) => `
-                    <div class="eletricista-selecionado">
-                        <strong>${index + 1}. ${elet.nome}</strong><br>
-                        <small>Mat: ${elet.matricula} | Base: ${elet.base}</small>
-                    </div>
-                `).join('');
+        // ✅ CARREGAR MOTIVOS DE AUSÊNCIA
+        const carregarMotivos = async () => {
+            try {
+                console.log('🔄 Iniciando carregamento de motivos...');
                 
-                eletricistagInfo.innerHTML = htmlEletricistas;
-                eletricistagInfo.classList.add('info-preenchida');
-                eletricistagInfo.classList.remove('info-vazia');
+                const response = await fetch('/api/motivos-indisponibilidade');
+                console.log('📡 Response status:', response.status);
                 
-                // Sugerir prefixo do primeiro selecionado
-                if (!prefixoInput.value) {
-                    prefixoInput.value = eletricistaSelecionados[0].prefixo;
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
-                btnAssociar.disabled = false;
+                const data = await response.json();
+                console.log('📦 Data recebida:', data);
+                
+                if (data.success) {
+                    this.motivosDisponiveis = data.motivos;
+                    this.motivosCarregados = true;
+                    console.log(`✅ ${this.motivosDisponiveis.length} motivos carregados`);
+                } else {
+                    console.error('❌ API retornou success: false');
+                    alert(`❌ Erro: ${data.erro || 'Erro desconhecido'}`);
+                }
+            } catch (error) {
+                console.error('❌ ERRO ao carregar motivos:', error);
+                alert(`❌ Erro ao carregar motivos: ${error.message}`);
             }
         };
         
-        // Evento de mudança nos checkboxes
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                const card = e.target.closest('.eletricista-card');
-                const eletData = {
-                    id: card.dataset.id,
-                    nome: e.target.dataset.nome,
-                    matricula: e.target.dataset.matricula,
-                    prefixo: e.target.dataset.prefixo,
-                    base: e.target.dataset.base
-                };
-                
-                if (e.target.checked) {
-                    // Adicionar se ainda não tiver 2
-                    if (eletricistaSelecionados.length < 2) {
-                        eletricistaSelecionados.push(eletData);
-                    } else {
-                        // Não deixar marcar mais de 2
-                        e.target.checked = false;
-                        return;
-                    }
-                } else {
-                    // Remover da lista
-                    eletricistaSelecionados = eletricistaSelecionados.filter(
-                        elet => elet.id !== eletData.id
-                    );
-                }
-                
-                atualizarInterface();
+        // Carregar motivos ao iniciar
+        carregarMotivos();
+        
+        // ✅ DETECTAR MUDANÇA NO TIPO DE REGISTRO
+        document.querySelectorAll('input[name="tipo_registro"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                modoAtual = radio.value;
+                this.limparTudo();
             });
         });
         
-        // Botão Associar
-        btnAssociar.addEventListener('click', () => {
-            if (eletricistaSelecionados.length === 0) return;
+        // ✅ QUANDO CHECKBOX É CLICADO
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                if (modoAtual === 'presenca') {
+                    this.handlePresencaClick(e.target, eletricistasIntermediarios);
+                } else {
+                    this.handleAusenciaClick(e.target);
+                }
+            });
+        });
+        
+        // Botão Limpar Todas
+        if (btnLimparTodas) {
+            btnLimparTodas.addEventListener('click', () => {
+                if (!confirm('🗑️ Limpar todas as associações pendentes?')) return;
+                this.limparTudo();
+            });
+        }
+    }
+    
+    // ==========================================
+    // PRESENÇA: CLICK NO CHECKBOX
+    // ==========================================
+    handlePresencaClick(checkbox, eletricistasIntermediarios) {
+        const eletId = checkbox.value;
+        const eletNome = checkbox.dataset.nome;
+        const prefixoSugerido = checkbox.dataset.prefixo;
+        
+        if (checkbox.checked) {
+            const limite = 2;
+            const atual = document.querySelectorAll('.checkbox-eletricista:checked').length;
             
-            const prefixo = prefixoInput.value.trim();
-            
-            if (!prefixo) {
-                alert('⚠️ Informe o prefixo da equipe!');
-                prefixoInput.focus();
+            if (atual > limite) {
+                alert('⚠️ Você já selecionou 2 eletricistas!');
+                checkbox.checked = false;
                 return;
             }
             
-            // Adicionar CADA eletricista à lista temporária
-            eletricistaSelecionados.forEach(eletricista => {
-                // Verificar se já foi associado
-                const jaAssociado = this.associacoesTemporarias.find(
-                    a => a.eletricista_id === eletricista.id
-                );
-                
-                if (!jaAssociado) {
-                    this.associacoesTemporarias.push({
-                        eletricista_id: eletricista.id,
-                        nome: eletricista.nome,
-                        matricula: eletricista.matricula,
-                        prefixo: prefixo
-                    });
-                    
-                    // Remover card da lista
-                    const card = document.querySelector(`.eletricista-card[data-id="${eletricista.id}"]`);
-                    card.style.display = 'none';
-                }
+            eletricistasIntermediarios.push({
+                eletricista_id: eletId,
+                nome: eletNome,
+                prefixo: prefixoSugerido
+            });
+        } else {
+            const index = eletricistasIntermediarios.findIndex(e => e.eletricista_id === eletId);
+            if (index > -1) {
+                eletricistasIntermediarios.splice(index, 1);
+            }
+        }
+        
+        this.atualizarPainelIntermediario(eletricistasIntermediarios);
+    }
+    
+    // ==========================================
+    // AUSÊNCIA: CLICK NO CHECKBOX
+    // ==========================================
+    async handleAusenciaClick(checkbox) {
+        const eletId = checkbox.value;
+        const eletNome = checkbox.dataset.nome;
+        const prefixoSugerido = checkbox.dataset.prefixo;
+        
+        if (checkbox.checked) {
+            if (!this.motivosCarregados || this.motivosDisponiveis.length === 0) {
+                checkbox.checked = false;
+                alert('❌ Erro ao carregar motivos. Tente novamente.');
+                return;
+            }
+            
+            // Desmarcar outros
+            document.querySelectorAll('.checkbox-eletricista').forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
             });
             
-            // Limpar seleção
-            checkboxes.forEach(cb => {
-                cb.checked = false;
-                cb.disabled = false;
-                cb.closest('.eletricista-card').style.opacity = '1';
-            });
-            
-            eletricistaSelecionados = [];
-            atualizarInterface();
-            
-            // Atualizar lista de associações
+            this.abrirModalMotivo(eletId, eletNome, prefixoSugerido, checkbox);
+        } else {
+            this.associacoesTemporarias = this.associacoesTemporarias.filter(a => a.eletricista_id !== eletId);
             this.atualizarListaAssociacoes();
+        }
+    }
+    
+    // ==========================================
+    // PAINEL INTERMEDIÁRIO (PRESENÇA)
+    // ==========================================
+    atualizarPainelIntermediario(eletricistasIntermediarios) {
+        const painel = document.getElementById('painelIntermediario');
+        const lista = document.getElementById('listaIntermediaria');
+        const inputPrefixo = document.getElementById('prefixoIntermediario');
+        
+        if (!painel) return;
+        
+        if (eletricistasIntermediarios.length === 0) {
+            painel.style.display = 'none';
+            return;
+        }
+        
+        painel.style.display = 'block';
+        
+        let html = '<div style="background: white; padding: 15px; border-radius: 5px; border: 2px solid #ffc107;">';
+        html += '<strong>Eletricistas Selecionados:</strong><br><br>';
+        
+        eletricistasIntermediarios.forEach((elet, idx) => {
+            html += `
+                <div style="padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 3px;">
+                    ${idx + 1}. <strong>${elet.nome}</strong><br>
+                    <small>Mat: ${elet.eletricista_id} | Prefixo: ${elet.prefixo}</small>
+                </div>
+            `;
         });
         
-        // Botão Salvar Frequência
-        if (btnSalvarFrequencia) {
-            btnSalvarFrequencia.addEventListener('click', async () => {
+        html += '</div>';
+        lista.innerHTML = html;
+        
+        if (!inputPrefixo.value) {
+            inputPrefixo.value = eletricistasIntermediarios[0].prefixo;
+        }
+        
+        setTimeout(() => {
+            painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        
+        const btnConfirmar = document.querySelector('#painelIntermediario button[onclick*="confirmarAssociacao"]');
+        if (btnConfirmar && !btnConfirmar.dataset.listenerAdded) {
+            btnConfirmar.dataset.listenerAdded = 'true';
+            btnConfirmar.onclick = () => this.confirmarAssociacao(eletricistasIntermediarios);
+        }
+        
+        const btnLimpar = document.querySelector('#painelIntermediario button[onclick*="limparSelecaoIntermediaria"]');
+        if (btnLimpar && !btnLimpar.dataset.listenerAdded) {
+            btnLimpar.dataset.listenerAdded = 'true';
+            btnLimpar.onclick = () => this.limparSelecaoIntermediaria(eletricistasIntermediarios);
+        }
+    }
+    
+    // ==========================================
+    // CONFIRMAR ASSOCIAÇÃO (PRESENÇA)
+    // ==========================================
+    confirmarAssociacao(eletricistasIntermediarios) {
+        const prefixo = document.getElementById('prefixoIntermediario').value.trim();
+        
+        if (!prefixo) {
+            alert('⚠️ Digite o prefixo!');
+            return;
+        }
+        
+        eletricistasIntermediarios.forEach(elet => {
+            this.associacoesTemporarias.push({
+                eletricista_id: elet.eletricista_id,
+                nome: elet.nome,
+                prefixo: prefixo,
+                tipo: 'presenca',
+                id_indisponibilidade: null
+            });
+        });
+        
+        eletricistasIntermediarios.length = 0;
+        document.getElementById('prefixoIntermediario').value = '';
+        document.getElementById('painelIntermediario').style.display = 'none';
+        
+        this.atualizarListaAssociacoes();
+    }
+    
+    // ==========================================
+    // LIMPAR SELEÇÃO INTERMEDIÁRIA
+    // ==========================================
+    limparSelecaoIntermediaria(eletricistasIntermediarios) {
+        if (!confirm('Desmarcar os eletricistas selecionados?')) return;
+        
+        eletricistasIntermediarios.forEach(elet => {
+            const checkbox = document.querySelector(`.checkbox-eletricista[value="${elet.eletricista_id}"]`);
+            if (checkbox) checkbox.checked = false;
+        });
+        
+        eletricistasIntermediarios.length = 0;
+        document.getElementById('prefixoIntermediario').value = '';
+        document.getElementById('painelIntermediario').style.display = 'none';
+    }
+    
+    // ==========================================
+    // ABRIR MODAL AUSÊNCIA
+    // ==========================================
+    abrirModalMotivo(eletId, eletNome, prefixo, checkbox) {
+        console.log('🔵 abrirModalMotivo:', eletNome);
+        
+        const modalAntigo = document.getElementById('modalMotivo');
+        if (modalAntigo) modalAntigo.remove();
+        
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'modalMotivo';
+        modalContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;';
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = 'background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;';
+        
+        const titulo = document.createElement('h3');
+        titulo.style.marginTop = '0';
+        titulo.innerHTML = '⚠️ Selecione o Motivo da Ausência';
+        modalContent.appendChild(titulo);
+        
+        const nomeP = document.createElement('p');
+        nomeP.innerHTML = `<strong>Eletricista:</strong> ${eletNome}`;
+        modalContent.appendChild(nomeP);
+        
+        const label = document.createElement('label');
+        label.style.cssText = 'display: block; margin-top: 20px; font-weight: bold;';
+        label.textContent = 'Motivo:';
+        modalContent.appendChild(label);
+        
+        const select = document.createElement('select');
+        select.id = 'selectMotivo';
+        select.style.cssText = 'width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; box-sizing: border-box;';
+        
+        const optionVazia = document.createElement('option');
+        optionVazia.value = '';
+        optionVazia.textContent = '-- Selecione --';
+        select.appendChild(optionVazia);
+        
+        this.motivosDisponiveis.forEach(motivo => {
+            const option = document.createElement('option');
+            option.value = motivo.id;
+            option.textContent = motivo.descricao;
+            select.appendChild(option);
+        });
+        
+        modalContent.appendChild(select);
+        
+        const botoesDiv = document.createElement('div');
+        botoesDiv.style.cssText = 'margin-top: 30px; display: flex; gap: 10px;';
+        
+        const btnConfirmar = document.createElement('button');
+        btnConfirmar.type = 'button';
+        btnConfirmar.innerHTML = '✅ Confirmar';
+        btnConfirmar.style.cssText = 'flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
+        btnConfirmar.addEventListener('click', () => this.confirmarMotivo(eletId, eletNome, prefixo));
+        
+        const btnCancelar = document.createElement('button');
+        btnCancelar.type = 'button';
+        btnCancelar.innerHTML = '❌ Cancelar';
+        btnCancelar.style.cssText = 'flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;';
+        btnCancelar.addEventListener('click', () => this.fecharModalMotivo(checkbox));
+        
+        botoesDiv.appendChild(btnConfirmar);
+        botoesDiv.appendChild(btnCancelar);
+        modalContent.appendChild(botoesDiv);
+        
+        modalContainer.appendChild(modalContent);
+        document.body.appendChild(modalContainer);
+    }
+    
+    // ==========================================
+    // CONFIRMAR MOTIVO (AUSÊNCIA)
+    // ==========================================
+    confirmarMotivo(eletId, eletNome, prefixo) {
+        console.log('🔵 confirmarMotivo chamada');
+        
+        const selectMotivo = document.getElementById('selectMotivo');
+        if (!selectMotivo) {
+            alert('❌ Erro: Select não encontrado');
+            return;
+        }
+        
+        const motivoId = selectMotivo.value;
+        if (!motivoId) {
+            alert('⚠️ Selecione um motivo!');
+            return;
+        }
+        
+        const motivo = this.motivosDisponiveis.find(m => m.id == motivoId);
+        if (!motivo) {
+            alert('❌ Motivo não encontrado');
+            return;
+        }
+        
+        this.associacoesTemporarias.push({
+            eletricista_id: eletId,
+            nome: eletNome,
+            prefixo: prefixo,
+            tipo: 'ausencia',
+            id_indisponibilidade: motivoId,
+            motivo_descricao: motivo.descricao
+        });
+        
+        console.log('✅ Associação adicionada:', this.associacoesTemporarias);
+        
+        this.fecharModalMotivo(null);
+        this.atualizarListaAssociacoes();
+    }
+    
+    // ==========================================
+    // FECHAR MODAL MOTIVO
+    // ==========================================
+    fecharModalMotivo(checkbox) {
+        const modal = document.getElementById('modalMotivo');
+        if (modal) modal.remove();
+        if (checkbox) checkbox.checked = false;
+    }
+    
+    // ==========================================
+    // LIMPAR TUDO
+    // ==========================================
+    limparTudo() {
+        this.associacoesTemporarias = [];
+        
+        document.querySelectorAll('.checkbox-eletricista').forEach(cb => {
+            cb.checked = false;
+        });
+        
+        const painelInt = document.getElementById('painelIntermediario');
+        if (painelInt) painelInt.style.display = 'none';
+        
+        this.atualizarListaAssociacoes();
+    }
+    
+    // ==========================================
+    // ATUALIZAR LISTA DE ASSOCIAÇÕES PENDENTES
+    // ==========================================
+    atualizarListaAssociacoes() {
+        const painel = document.getElementById('painelAssociacoes');
+        if (!painel) return;
+        
+        if (this.associacoesTemporarias.length === 0) {
+            painel.style.display = 'none';
+            return;
+        }
+        
+        painel.style.display = 'block';
+        
+        let html = '<div class="alert alert-warning"><h4>📋 Associações Pendentes de Salvamento:</h4>';
+        
+        this.associacoesTemporarias.forEach((assoc, index) => {
+            if (assoc.tipo === 'presenca') {
+                html += `
+                    <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border: 2px solid #28a745;">
+                        <strong>${assoc.nome}</strong><br>
+                        Mat: ${assoc.eletricista_id} — Prefixo: <strong>${assoc.prefixo}</strong>
+                        <button onclick="registroV2.removerAssociacao(${index})" style="float: right; background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">🗑️ Remover</button>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border: 2px solid #ffc107;">
+                        <strong>${assoc.nome}</strong><br>
+                        Mat: ${assoc.eletricista_id} — Prefixo: <strong>${assoc.prefixo}</strong><br>
+                        <span style="color: #dc3545; font-weight: bold;">⚠️ Motivo: ${assoc.motivo_descricao}</span>
+                        <button onclick="registroV2.removerAssociacao(${index})" style="float: right; background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">🗑️ Remover</button>
+                    </div>
+                `;
+            }
+        });
+        
+        html += `
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button onclick="registroV2.limparTudo()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                    🗑️ Limpar Todas
+                </button>
+                <button id="btn-salvar-frequencia-dinamico" style="flex: 2; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;">
+                    💾 Salvar Todas as Associações
+                </button>
+            </div>
+        `;
+        
+        html += '</div>';
+        painel.innerHTML = html;
+        
+        // ✅ EVENTO DO BOTÃO SALVAR (ÚNICO LUGAR DE SALVAMENTO)
+        const btnSalvar = document.getElementById('btn-salvar-frequencia-dinamico');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', async () => {
                 if (this.associacoesTemporarias.length === 0) {
                     alert('⚠️ Não há associações para salvar!');
                     return;
                 }
                 
-                if (!confirm(`💾 Salvar ${this.associacoesTemporarias.length} associação(ões)?`)) {
+                if (!confirm(`💾 Salvar ${this.associacoesTemporarias.length} registro(s)?`)) {
                     return;
                 }
                 
                 try {
-                    btnSalvarFrequencia.disabled = true;
-                    btnSalvarFrequencia.textContent = '⏳ Salvando...';
+                    btnSalvar.disabled = true;
+                    btnSalvar.textContent = '⏳ Salvando...';
                     
-                    // Pegar data selecionada do campo
-                    const dataRegistro = document.getElementById('data-registro').value;
+                    const dataRegistro = document.querySelector('input[name="data"]').value;
+                    const associacoesSalvas = [...this.associacoesTemporarias];
                     
                     const response = await fetch('/api/salvar-frequencia', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            associacoes: this.associacoesTemporarias,
+                            associacoes: this.associacoesTemporarias.map(a => ({
+                                eletricista_id: a.eletricista_id,
+                                prefixo: a.prefixo,
+                                id_indisponibilidade: a.id_indisponibilidade
+                            })),
                             data: dataRegistro 
                         })
                     });
@@ -213,77 +489,147 @@ class RegistroV2 {
                     const result = await response.json();
                     
                     if (result.success) {
-                        alert(`✅ ${result.total} associação(ões) salva(s) com sucesso!`);
-                        window.location.reload();
+                        // ✅ REMOVER CARDS DOS ELETRICISTAS SALVOS
+                        this.associacoesTemporarias.forEach(assoc => {
+                            const checkbox = document.querySelector(`.checkbox-eletricista[value="${assoc.eletricista_id}"]`);
+                            
+                            if (checkbox) {
+                                let card = checkbox.closest('.eletricista-card');
+                                if (!card) card = checkbox.closest('[data-id]');
+                                if (!card) card = checkbox.closest('div[style*="border"]');
+                                if (!card) card = checkbox.parentElement?.parentElement?.parentElement;
+                                
+                                if (card) {
+                                    console.log('✅ Removendo card:', assoc.nome);
+                                    card.remove();
+                                } else {
+                                    console.warn('⚠️ Card não encontrado:', assoc.nome);
+                                }
+                            }
+                        });
+                        
+                        // ✅ ATUALIZAR CONTADOR
+                        const totalElement = document.querySelector('.total-eletricistas');
+                        if (totalElement) {
+                            const match = totalElement.textContent.match(/\d+/);
+                            if (match) {
+                                const totalAtual = parseInt(match[0]);
+                                const novoTotal = totalAtual - associacoesSalvas.length;
+                                totalElement.textContent = `Total: ${novoTotal} eletricista(s)`;
+                            }
+                        }
+                        
+                        const contadorHeader = document.querySelector('#contador-selecao');
+                        if (contadorHeader) {
+                            const match = contadorHeader.textContent.match(/Total: (\d+)/);
+                            if (match) {
+                                const totalAtual = parseInt(match[1]);
+                                const novoTotal = totalAtual - associacoesSalvas.length;
+                                contadorHeader.textContent = contadorHeader.textContent.replace(/Total: \d+/, `Total: ${novoTotal}`);
+                            }
+                        }
+                        
+                        this.mostrarRegistrosSalvos(associacoesSalvas, result.data);
+                        this.associacoesTemporarias = [];
+                        this.atualizarListaAssociacoes();
+                        painel.style.display = 'none';
+                        
+                        alert(`✅ ${associacoesSalvas.length} registro(s) salvo(s) com sucesso!`);
                     } else {
                         alert(`❌ Erro: ${result.erro}`);
                     }
-                    
                 } catch (error) {
                     alert('❌ Erro ao salvar: ' + error.message);
                 } finally {
-                    btnSalvarFrequencia.disabled = false;
-                    btnSalvarFrequencia.textContent = '💾 Salvar Todas as Associações';
+                    btnSalvar.disabled = false;
+                    btnSalvar.textContent = '💾 Salvar Todas as Associações';
                 }
-            });
-        }
-        
-        // Botão Limpar Todas
-        if (btnLimparTodas) {
-            btnLimparTodas.addEventListener('click', () => {
-                if (!confirm('🗑️ Limpar todas as associações pendentes?')) return;
-                
-                // Mostrar todos os cards novamente
-                document.querySelectorAll('.eletricista-card').forEach(card => {
-                    card.style.display = 'block';
-                });
-                
-                // Limpar lista
-                this.associacoesTemporarias = [];
-                this.atualizarListaAssociacoes();
             });
         }
     }
     
-    atualizarListaAssociacoes() {
-        const container = document.getElementById('associacoes-temporarias');
-        const lista = document.getElementById('lista-associacoes');
+    removerAssociacao(index) {
+        const assoc = this.associacoesTemporarias[index];
+        const checkbox = document.querySelector(`.checkbox-eletricista[value="${assoc.eletricista_id}"]`);
+        if (checkbox) checkbox.checked = false;
         
-        if (this.associacoesTemporarias.length === 0) {
-            container.style.display = 'none';
-            return;
+        this.associacoesTemporarias.splice(index, 1);
+        this.atualizarListaAssociacoes();
+    }
+    
+    // ==========================================
+    // MOSTRAR REGISTROS SALVOS
+    // ==========================================
+    mostrarRegistrosSalvos(associacoes, dataSalva) {
+        let painelSalvos = document.getElementById('painelRegistrosSalvos');
+        
+        if (!painelSalvos) {
+            painelSalvos = document.createElement('div');
+            painelSalvos.id = 'painelRegistrosSalvos';
+            painelSalvos.style.marginTop = '30px';
+            
+            const secaoFreq = document.getElementById('secao-frequencia');
+            if (secaoFreq) secaoFreq.appendChild(painelSalvos);
         }
         
-        container.style.display = 'block';
+        painelSalvos.style.display = 'block';
         
-        lista.innerHTML = this.associacoesTemporarias.map((assoc, index) => `
-            <div class="associacao-item">
-                <div class="associacao-detalhes">
-                    <strong>${assoc.nome}</strong>
-                    <small>Mat: ${assoc.matricula} → Prefixo: ${assoc.prefixo}</small>
-                </div>
-                <button class="btn-remover-associacao" data-index="${index}">
-                    🗑️ Remover
-                </button>
-            </div>
-        `).join('');
-        
-        // Adicionar eventos aos botões de remover
-        lista.querySelectorAll('.btn-remover-associacao').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const index = parseInt(e.target.dataset.index);
-                const assoc = this.associacoesTemporarias[index];
-                
-                // Mostrar card novamente
-                const card = document.querySelector(`.eletricista-card[data-id="${assoc.eletricista_id}"]`);
-                if (card) card.style.display = 'block';
-                
-                // Remover da lista
-                this.associacoesTemporarias.splice(index, 1);
-                this.atualizarListaAssociacoes();
-            });
+        const porPrefixo = {};
+        associacoes.forEach(assoc => {
+            if (!porPrefixo[assoc.prefixo]) porPrefixo[assoc.prefixo] = [];
+            porPrefixo[assoc.prefixo].push(assoc);
         });
-    }    
+        
+        let novoBloco = '';
+        
+        Object.keys(porPrefixo).sort().forEach(prefixo => {
+            const eletricistas = porPrefixo[prefixo];
+            
+            novoBloco += `
+                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #667eea;">
+                    <div style="font-weight: bold; color: #667eea; margin-bottom: 10px; font-size: 16px;">
+                        🚗 Prefixo: ${prefixo}
+                    </div>
+                    <div style="padding-left: 15px;">
+            `;
+            
+            eletricistas.forEach((elet, index) => {
+                if (elet.tipo === 'presenca') {
+                    novoBloco += `
+                        <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                            <strong>${index + 1}. ${elet.nome}</strong><br>
+                            <small style="color: #666;">Matrícula: ${elet.eletricista_id}</small>
+                        </div>
+                    `;
+                } else {
+                    novoBloco += `
+                        <div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0; background: #fff3cd;">
+                            <strong>${index + 1}. ${elet.nome}</strong><br>
+                            <small style="color: #666;">Matrícula: ${elet.eletricista_id}</small><br>
+                            <span style="color: #856404;">⚠️ ${elet.motivo_descricao}</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            novoBloco += '</div></div>';
+        });
+        
+        if (painelSalvos.innerHTML.trim() === '') {
+            painelSalvos.innerHTML = `
+                <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 10px; padding: 20px;">
+                    <h4 style="color: #155724; margin-top: 0;">✅ Registros Salvos com Sucesso</h4>
+                    <p style="color: #155724;">📅 Data: ${dataSalva}</p>
+                </div>
+            `;
+        }
+        
+        painelSalvos.innerHTML += novoBloco;
+        
+        setTimeout(() => {
+            painelSalvos.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
     
     // ==========================================
     // SEÇÃO 2: REMANEJADO
@@ -297,7 +643,6 @@ class RegistroV2 {
         
         inputBusca.addEventListener('input', (e) => {
             const termo = e.target.value.trim();
-            
             clearTimeout(debounceTimer);
             
             if (termo.length < 3) {
@@ -307,20 +652,11 @@ class RegistroV2 {
             
             debounceTimer = setTimeout(async () => {
                 try {
-                    // Pegar data selecionada
-                    const dataRegistro = document.getElementById('data-registro').value;
-                    
-                    // DEBUG
+                    const dataRegistro = document.querySelector('input[name="data"]').value;
                     const apiUrl = `/api/buscar-eletricistas-remanejar?q=${encodeURIComponent(termo)}&data=${dataRegistro}`;
-                    console.log('🔍 [REMANEJAR] Buscando em:', apiUrl);
-                    console.log('📊 [REMANEJAR] Data:', dataRegistro);
-                    
                     const response = await fetch(apiUrl);
                     const data = await response.json();
                     
-                    console.log('✅ [REMANEJAR] Total de resultados:', data.eletricistas.length);
-                    
-                    // ✅ MOSTRAR RESULTADOS DIRETAMENTE (SEM CHAMAR FUNÇÃO SEPARADA)
                     if (data.eletricistas.length === 0) {
                         resultadoDiv.innerHTML = '<p style="color: #999;">Nenhum eletricista encontrado</p>';
                     } else {
@@ -336,9 +672,8 @@ class RegistroV2 {
                             </div>
                         `).join('');
                     }
-                    
                 } catch (error) {
-                    console.error('❌ [REMANEJAR] Erro:', error);
+                    console.error('❌ Erro:', error);
                     resultadoDiv.innerHTML = '<p style="color: red;">❌ Erro ao buscar eletricistas</p>';
                 }
             }, 300);
@@ -349,60 +684,437 @@ class RegistroV2 {
     // SEÇÃO 3: INDISPONÍVEL
     // ==========================================
     setupIndisponivel() {
-        const form = document.getElementById('form-indisponivel');
-        const inputEletricista = document.getElementById('eletricista-indisponivel');
-        const inputEletricstaId = document.getElementById('eletricista-id-indisponivel');
+        console.log('🔧 Iniciando setupIndisponivel...');
         
-        if (!form || !inputEletricista) return;
+        // ✅ Inicializar array de pendentes
+        if (!this.indisponibilidadesPendentes) {
+            this.indisponibilidadesPendentes = [];
+        }
         
-        // Autocomplete para eletricista
-        new AutocompleteIndisponivel(inputEletricista, inputEletricstaId);
+        const selectEletricista = document.getElementById('select-eletricista-ausente');
+        const prefixoInput = document.getElementById('prefixo-indisponivel');
+        const selectMotivo = document.getElementById('select-motivo-indisponivel');
+        const observacoesInput = document.getElementById('observacoes-indisponivel');
+        const btnAdicionar = document.getElementById('btn-adicionar-indisponibilidade');
         
-        // Submit do formulário
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        if (!selectEletricista) {
+            console.warn('❌ Select de eletricista não encontrado');
+            return;
+        }
+        
+        console.log('✅ Elementos encontrados');
+        
+        // ========================================
+        // 1️⃣ PREENCHER PREFIXO E MOTIVO AUTOMATICAMENTE
+        // ========================================
+        selectEletricista.addEventListener('change', function() {
+            console.log('📝 Eletricista selecionado');
             
-            const formData = new FormData(form);
-            const eletricstaId = inputEletricstaId.value;
+            const selectedOption = this.options[this.selectedIndex];
             
-            if (!eletricstaId) {
-                alert('⚠️ Selecione um eletricista da lista!');
-                return;
+            if (selectedOption && selectedOption.value) {
+                // ✅ PREFIXO
+                const prefixo = selectedOption.getAttribute('data-prefixo') || '';
+                console.log('Prefixo:', prefixo);
+                if (prefixoInput) {
+                    prefixoInput.value = prefixo;
+                    console.log('✅ Prefixo preenchido:', prefixo);
+                }
+                
+                // ✅ MOTIVO
+                const motivoTexto = selectedOption.getAttribute('data-motivo') || '';
+                console.log('Motivo do eletricista:', motivoTexto);
+                
+                if (selectMotivo && motivoTexto) {
+                    let motivoEncontrado = false;
+                    
+                    for (let i = 0; i < selectMotivo.options.length; i++) {
+                        const optionMotivo = selectMotivo.options[i];
+                        const textoMotivo = optionMotivo.text.trim().toUpperCase();
+                        const motivoBusca = motivoTexto.trim().toUpperCase();
+                        
+                        if (textoMotivo === motivoBusca) {
+                            selectMotivo.selectedIndex = i;
+                            motivoEncontrado = true;
+                            console.log('✅ Motivo selecionado:', optionMotivo.text);
+                            break;
+                        }
+                    }
+                    
+                    if (!motivoEncontrado) {
+                        console.warn('⚠️ Motivo não encontrado:', motivoTexto);
+                    }
+                }
+            } else {
+                // Limpar campos
+                if (prefixoInput) prefixoInput.value = '';
+                if (selectMotivo) selectMotivo.selectedIndex = 0;
             }
+        });
+        
+        // ========================================
+        // 2️⃣ BOTÕES PARCIAL/TOTAL - FUNCIONANDO
+        // ========================================
+        const cardParcial = document.getElementById('card-parcial');
+        const cardTotal = document.getElementById('card-total');
+        const radioParcial = document.getElementById('radio-parcial');
+        const radioTotal = document.getElementById('radio-total');
+        
+        console.log('Cards:', { cardParcial, cardTotal, radioParcial, radioTotal });
+        
+        if (cardParcial && radioParcial) {
+            cardParcial.addEventListener('click', function() {
+                console.log('🔘 Card PARCIAL clicado');
+                
+                // Desmarcar todos
+                cardParcial.style.borderColor = '#ffc107';
+                cardParcial.style.background = '#fff9e6';
+                cardTotal.style.borderColor = '#dee2e6';
+                cardTotal.style.background = 'white';
+                
+                radioParcial.checked = true;
+                radioTotal.checked = false;
+                
+                console.log('✅ Parcial selecionado');
+            });
+        }
+        
+        if (cardTotal && radioTotal) {
+            cardTotal.addEventListener('click', function() {
+                console.log('🔘 Card TOTAL clicado');
+                
+                // Desmarcar todos
+                cardTotal.style.borderColor = '#ffc107';
+                cardTotal.style.background = '#fff9e6';
+                cardParcial.style.borderColor = '#dee2e6';
+                cardParcial.style.background = 'white';
+                
+                radioTotal.checked = true;
+                radioParcial.checked = false;
+                
+                console.log('✅ Total selecionado');
+            });
+        }
+        
+        // ========================================
+        // 3️⃣ BOTÃO ADICIONAR À LISTA
+        // ========================================
+        if (btnAdicionar) {
+            console.log('✅ Botão Adicionar encontrado');
             
-            if (!confirm('⚠️ Confirmar registro de indisponibilidade?')) {
-                return;
+            btnAdicionar.addEventListener('click', () => {
+                console.log('➕ Botão Adicionar clicado');
+                
+                const eletricista_id = selectEletricista?.value;
+                const selectedOption = selectEletricista?.options[selectEletricista.selectedIndex];
+                const eletricista_nome = selectedOption?.getAttribute('data-nome');
+                const matricula = selectedOption?.getAttribute('data-matricula');
+                const prefixo = prefixoInput?.value;
+                const tipoRadio = document.querySelector('input[name="tipo_indisponibilidade_temp"]:checked');
+                const motivo_id = selectMotivo?.value;
+                const motivo_texto = selectMotivo?.options[selectMotivo.selectedIndex]?.text;
+                const observacoes = observacoesInput?.value;
+                
+                console.log('Dados coletados:', {
+                    eletricista_id,
+                    eletricista_nome,
+                    matricula,
+                    prefixo,
+                    tipo: tipoRadio?.value,
+                    motivo_id,
+                    motivo_texto,
+                    observacoes
+                });
+                
+                // ✅ VALIDAÇÕES
+                if (!eletricista_id) {
+                    alert('⚠️ Selecione um eletricista!');
+                    return;
+                }
+                
+                if (!prefixo || prefixo.trim() === '') {
+                    alert('⚠️ Informe o prefixo!');
+                    if (prefixoInput) prefixoInput.focus();
+                    return;
+                }
+                
+                if (!tipoRadio) {
+                    alert('⚠️ Selecione o tipo de indisponibilidade (Parcial ou Total)!');
+                    return;
+                }
+                
+                if (!motivo_id) {
+                    alert('⚠️ Selecione o motivo!');
+                    return;
+                }
+                
+                // Verificar duplicata
+                const jaExiste = this.indisponibilidadesPendentes.some(i => i.eletricista_id === parseInt(eletricista_id));
+                if (jaExiste) {
+                    alert('⚠️ Este eletricista já está na lista de pendentes!');
+                    return;
+                }
+                
+                // ✅ ADICIONAR À LISTA
+                this.indisponibilidadesPendentes.push({
+                    eletricista_id: parseInt(eletricista_id),
+                    eletricista_nome: eletricista_nome,
+                    matricula: matricula,
+                    prefixo: prefixo,
+                    tipo: tipoRadio.value,
+                    motivo_id: parseInt(motivo_id),
+                    motivo_texto: motivo_texto,
+                    observacoes: observacoes || ''
+                });
+                
+                console.log('✅ Adicionado à lista:', this.indisponibilidadesPendentes);
+                
+                // ✅ LIMPAR CAMPOS
+                selectEletricista.selectedIndex = 0;
+                if (prefixoInput) prefixoInput.value = '';
+                if (selectMotivo) selectMotivo.selectedIndex = 0;
+                if (observacoesInput) observacoesInput.value = '';
+                
+                // Desmarcar cards
+                if (cardParcial) {
+                    cardParcial.style.borderColor = '#dee2e6';
+                    cardParcial.style.background = 'white';
+                }
+                if (cardTotal) {
+                    cardTotal.style.borderColor = '#dee2e6';
+                    cardTotal.style.background = 'white';
+                }
+                if (radioParcial) radioParcial.checked = false;
+                if (radioTotal) radioTotal.checked = false;
+                
+                // ✅ ATUALIZAR PAINEL
+                this.atualizarPainelIndisponibilidades();
+            });
+        } else {
+            console.error('❌ Botão Adicionar NÃO encontrado!');
+        }
+        
+        // ========================================
+        // 4️⃣ BOTÃO LIMPAR TODAS
+        // ========================================
+        const btnLimpar = document.getElementById('btn-limpar-indisponibilidades');
+        if (btnLimpar) {
+            btnLimpar.addEventListener('click', () => {
+                if (confirm('🗑️ Limpar todas as indisponibilidades pendentes?')) {
+                    this.indisponibilidadesPendentes = [];
+                    this.atualizarPainelIndisponibilidades();
+                }
+            });
+        }
+        
+        // ========================================
+        // 5️⃣ BOTÃO SALVAR TODAS
+        // ========================================
+        const btnSalvar = document.getElementById('btn-salvar-indisponibilidades');
+        if (btnSalvar) {
+            btnSalvar.addEventListener('click', async () => {
+                if (this.indisponibilidadesPendentes.length === 0) {
+                    alert('⚠️ Nenhuma indisponibilidade para salvar!');
+                    return;
+                }
+                
+                if (!confirm(`💾 Salvar ${this.indisponibilidadesPendentes.length} indisponibilidade(s)?`)) {
+                    return;
+                }
+                
+                try {
+                    btnSalvar.disabled = true;
+                    btnSalvar.textContent = '⏳ Salvando...';
+                    btnSalvar.style.background = '#ccc';
+                    
+                    const dataInput = document.querySelector('input[name="data"]');
+                    const data = dataInput ? dataInput.value : new Date().toISOString().split('T')[0];
+                    
+                    let totalSalvas = 0;
+                    let erros = [];
+                    
+                    for (const indisp of this.indisponibilidadesPendentes) {
+                        const formData = new FormData();
+                        formData.append('eletricista_id', indisp.eletricista_id);
+                        formData.append('prefixo', indisp.prefixo);
+                        formData.append('tipo_indisponibilidade', indisp.tipo);
+                        formData.append('motivo_id', indisp.motivo_id);
+                        formData.append('observacoes', indisp.observacoes);
+                        formData.append('data', data);
+                        
+                        try {
+                            const response = await fetch('/api/salvar-indisponibilidade', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                totalSalvas++;
+                            } else {
+                                erros.push(`${indisp.eletricista_nome}: ${result.erro}`);
+                            }
+                        } catch (error) {
+                            erros.push(`${indisp.eletricista_nome}: ${error.message}`);
+                        }
+                    }
+                    
+                    if (totalSalvas > 0) {
+                        alert(`✅ ${totalSalvas} indisponibilidade(s) salva(s) com sucesso!${erros.length > 0 ? '\n\n❌ Erros:\n' + erros.join('\n') : ''}`);
+                        window.location.reload();
+                    } else {
+                        alert('❌ Nenhuma indisponibilidade foi salva!\n\n' + erros.join('\n'));
+                        btnSalvar.disabled = false;
+                        btnSalvar.textContent = '💾 Salvar Todas as Indisponibilidades';
+                        btnSalvar.style.background = '#28a745';
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao salvar:', error);
+                    alert('❌ Erro ao salvar: ' + error.message);
+                    btnSalvar.disabled = false;
+                    btnSalvar.textContent = '💾 Salvar Todas as Indisponibilidades';
+                    btnSalvar.style.background = '#28a745';
+                }
+            });
+        }
+        
+        console.log('✅ setupIndisponivel concluído!');
+    }
+
+    // ========================================
+    // FUNÇÃO DESFAZER REGISTRO
+    // ========================================
+    setupDesfazerRegistro() {
+        const btnDesfazer = document.getElementById('btn-desfazer-registro');
+        if (!btnDesfazer) return;
+        
+        btnDesfazer.addEventListener('click', async () => {
+            // ✅ PASSO 1: Pedir matrícula
+            const matricula = prompt('🔢 Digite a MATRÍCULA do eletricista para desfazer o registro de HOJE:');
+            
+            if (!matricula || matricula.trim() === '') {
+                return; // Cancelou
             }
             
             try {
-                const submitBtn = form.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-                submitBtn.textContent = '⏳ Salvando...';                
+                // ✅ PASSO 2: Buscar registro no backend
+                const dataInput = document.querySelector('input[name="data"]');
+                const data = dataInput ? dataInput.value : new Date().toISOString().split('T')[0];
                 
-                // Adicionar data ao FormData
-                const dataRegistro = document.getElementById('data-registro').value;
-                formData.append('data', dataRegistro);
-                
-                const response = await fetch('/api/salvar-indisponibilidade', {
-                    method: 'POST',
-                    body: formData
-                });
-                
+                const response = await fetch(`/api/buscar-registro-para-desfazer?matricula=${encodeURIComponent(matricula.trim())}&data=${data}`);
                 const result = await response.json();
                 
-                if (result.success) {
-                    alert('✅ Indisponibilidade registrada com sucesso!');
-                    window.location.reload();
+                if (!result.success) {
+                    alert(`❌ ${result.erro}`);
+                    return;
+                }
+                
+                // ✅ PASSO 3: Mostrar confirmação com nome do eletricista
+                const eletricista = result.eletricista;
+                const tipoTexto = result.tipo === 'presenca' ? 'PRESENÇA' : 'AUSÊNCIA';
+                const motivoTexto = result.motivo || 'N/A';
+                
+                const confirmacao = confirm(
+                    `🔄 DESFAZER REGISTRO?\n\n` +
+                    `Eletricista: ${eletricista.nome}\n` +
+                    `Matrícula: ${eletricista.matricula}\n` +
+                    `Prefixo: ${eletricista.prefixo}\n` +
+                    `Tipo: ${tipoTexto}\n` +
+                    `Motivo: ${motivoTexto}\n` +
+                    `Data: ${result.data}\n\n` +
+                    `⚠️ Esta ação irá REMOVER este registro e o eletricista voltará para a lista!\n\n` +
+                    `Confirmar?`
+                );
+                
+                if (!confirmacao) {
+                    return; // Cancelou
+                }
+                
+                // ✅ PASSO 4: Desfazer registro
+                const responseDesfazer = await fetch('/api/desfazer-registro', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        matricula: matricula.trim(),
+                        data: data
+                    })
+                });
+                
+                const resultDesfazer = await responseDesfazer.json();
+                
+                if (resultDesfazer.success) {
+                    alert(`✅ Registro desfeito com sucesso!\n\n${eletricista.nome} voltará a aparecer na lista.`);
+                    window.location.reload(); // Recarregar página
                 } else {
-                    alert(`❌ Erro: ${result.erro}`);
+                    alert(`❌ Erro ao desfazer: ${resultDesfazer.erro}`);
                 }
                 
             } catch (error) {
-                alert('❌ Erro ao salvar: ' + error.message);
+                alert(`❌ Erro: ${error.message}`);
             }
         });
     }
-}
+    
+    // ========================================
+    // FUNÇÃO AUXILIAR: ATUALIZAR PAINEL
+    // ========================================
+    atualizarPainelIndisponibilidades() {
+        const painel = document.getElementById('painel-indisponibilidades-pendentes');
+        const lista = document.getElementById('lista-indisponibilidades-pendentes');
+        
+        if (!painel || !lista) {
+            console.warn('⚠️ Painel ou lista não encontrados');
+            return;
+        }
+        
+        if (this.indisponibilidadesPendentes.length === 0) {
+            painel.style.display = 'none';
+            return;
+        }
+        
+        painel.style.display = 'block';
+        
+        let html = '';
+        this.indisponibilidadesPendentes.forEach((indisp, index) => {
+            const tipoBadge = indisp.tipo === 'parcial' 
+                ? '<span style="background: #17a2b8; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px;">PARCIAL</span>'
+                : '<span style="background: #dc3545; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px;">TOTAL</span>';
+            
+            html += `
+                <div style="background: white; border: 1px solid #ffc107; border-radius: 5px; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${index + 1}. ${indisp.eletricista_nome}</strong> (Mat: ${indisp.matricula})<br>
+                        <small>Prefixo: <strong>${indisp.prefixo}</strong> | Motivo: <strong>${indisp.motivo_texto}</strong> | ${tipoBadge}</small>
+                        ${indisp.observacoes ? `<br><small style="color: #666;">Obs: ${indisp.observacoes}</small>` : ''}
+                    </div>
+                    <button onclick="registroV2.removerIndisponibilidade(${index})" 
+                            style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                        🗑️ Remover
+                    </button>
+                </div>
+            `;
+        });
+        
+        lista.innerHTML = html;
+        console.log('✅ Painel atualizado com', this.indisponibilidadesPendentes.length, 'item(s)');
+    }
+    
+    // ========================================
+    // FUNÇÃO AUXILIAR: REMOVER ITEM
+    // ========================================
+    removerIndisponibilidade(index) {
+        if (confirm('🗑️ Remover esta indisponibilidade da lista?')) {
+            this.indisponibilidadesPendentes.splice(index, 1);
+            this.atualizarPainelIndisponibilidades();
+        }
+    }
+
+
+} //ver se esta chave fica
 
 // ==========================================
 // AUTOCOMPLETE PARA INDISPONÍVEL
@@ -413,15 +1125,12 @@ class AutocompleteIndisponivel {
         this.hiddenId = hiddenIdElement;
         this.sugestoes = null;
         this.debounceTimer = null;
-        
         this.init();
     }
     
     init() {
         this.criarElementoSugestoes();
-        
         this.input.addEventListener('input', (e) => this.handleInput(e));
-        
         document.addEventListener('click', (e) => {
             if (!this.input.contains(e.target) && !this.sugestoes.contains(e.target)) {
                 this.fecharSugestoes();
@@ -433,14 +1142,12 @@ class AutocompleteIndisponivel {
         this.sugestoes = document.createElement('div');
         this.sugestoes.className = 'autocomplete-sugestoes';
         this.sugestoes.style.display = 'none';
-        
         this.input.parentNode.style.position = 'relative';
         this.input.parentNode.appendChild(this.sugestoes);
     }
     
     handleInput(e) {
         const valor = e.target.value.trim();
-        
         clearTimeout(this.debounceTimer);
         this.hiddenId.value = '';
         
@@ -456,15 +1163,10 @@ class AutocompleteIndisponivel {
     
     async buscarEletricistas(termo) {
         try {
-            
-            // Pegar data selecionada
-            const dataRegistro = document.getElementById('data-registro').value;        
+            const dataRegistro = document.querySelector('input[name="data"]').value;
             const response = await fetch(`/api/buscar-eletricistas?q=${encodeURIComponent(termo)}&data=${dataRegistro}`);
-            
             const data = await response.json();
-            
             this.mostrarSugestoes(data.eletricistas);
-            
         } catch (error) {
             console.error('Erro ao buscar:', error);
         }
@@ -484,15 +1186,9 @@ class AutocompleteIndisponivel {
             item.className = 'autocomplete-item';
             item.innerHTML = `
                 <div class="autocomplete-nome">${elet.nome}</div>
-                <div class="autocomplete-detalhes">
-                    Mat: ${elet.matricula} | Base: ${elet.base}
-                </div>
+                <div class="autocomplete-detalhes">Mat: ${elet.matricula} | Base: ${elet.base}</div>
             `;
-            
-            item.addEventListener('click', () => {
-                this.selecionarEletricista(elet);
-            });
-            
+            item.addEventListener('click', () => this.selecionarEletricista(elet));
             this.sugestoes.appendChild(item);
         });
         
@@ -503,7 +1199,6 @@ class AutocompleteIndisponivel {
         this.input.value = elet.nome;
         this.hiddenId.value = elet.id;
         
-        // Sugerir prefixo
         const prefixoInput = document.getElementById('prefixo-indisponivel');
         if (prefixoInput && !prefixoInput.value) {
             prefixoInput.value = elet.prefixo;
@@ -521,9 +1216,7 @@ class AutocompleteIndisponivel {
 // FUNÇÃO GLOBAL PARA REMANEJAMENTO
 // ==========================================
 async function remanejarEletricista(id, nome, base) {
-    if (!confirm(`🔄 Remanejar ${nome} (Base: ${base}) para sua supervisão?`)) {
-        return;
-    }
+    if (!confirm(`🔄 Remanejar ${nome} (Base: ${base}) para sua supervisão?`)) return;
     
     try {
         const response = await fetch('/api/remanejar-eletricista', {
@@ -536,35 +1229,40 @@ async function remanejarEletricista(id, nome, base) {
         
         if (result.success) {
             alert(`✅ ${nome} foi remanejado com sucesso!\n\nAgora você pode associá-lo na seção FREQUÊNCIA.`);
-            // Recarregar para atualizar lista
             window.location.reload();
         } else {
             alert(`❌ Erro: ${result.erro}`);
         }
-        
     } catch (error) {
         alert('❌ Erro ao remanejar: ' + error.message);
     }
 }
 
-// =============================================
+// ==========================================
 // CALENDÁRIO - FILTRO DE DATA
-// =============================================
+// ==========================================
 function inicializarCalendario() {
-    const dataInput = document.getElementById('data-registro');
+    const dataInput = document.querySelector('input[name="data"]');
     if (dataInput) {
         dataInput.addEventListener('change', function() {
             const dataSelecionada = this.value;
-            // Recarregar página com nova data
             window.location.href = `/registrar-v2?data=${dataSelecionada}`;
         });
     }
 }
 
-// =============================================
-// INICIALIZAR QUANDO PÁGINA CARREGAR
-// =============================================
+// ==========================================
+// INICIALIZAR
+// ==========================================
+let registroV2;
+
 document.addEventListener('DOMContentLoaded', () => {
-    new RegistroV2();
-    inicializarCalendario(); // Inicializar filtro de data
+    registroV2 = new RegistroV2();
+    inicializarCalendario();
 });
+
+
+
+
+
+

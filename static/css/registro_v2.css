@@ -662,4 +662,191 @@ body {
     cursor: not-allowed;
 }
 
+/* ==========================================
+   REGISTROS SALVOS
+========================================== */
+
+#registros-salvos {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+    border: 2px solid #28a745;
+}
+
+#registros-salvos h4 {
+    margin: 0 0 20px 0;
+    font-size: 20px;
+}
+
+#lista-salvos {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+#btn-continuar-registrando {
+    min-width: 250px;
+    font-size: 16px;
+    padding: 12px 24px;
+}
+
+#btn-continuar-registrando:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+/* ==========================================
+   SELETOR PRESENÇA/AUSÊNCIA
+   ========================================== */
+.tipo-registro-selector {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.tipo-registro-selector h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.radio-group {
+    display: flex;
+    gap: 20px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 12px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.radio-label:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.radio-label input[type="radio"] {
+    display: none;
+}
+
+.radio-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    margin-right: 10px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.radio-label input[type="radio"]:checked ~ .radio-custom {
+    border-color: #667eea;
+    background: #667eea;
+}
+
+.radio-label input[type="radio"]:checked ~ .radio-custom::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.radio-label input[type="radio"]:checked ~ .radio-text {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.radio-text {
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+/* Painéis de Opções */
+.painel-opcoes {
+    margin-top: 20px;
+}
+
+.painel-opcoes .form-group {
+    margin-bottom: 15px;
+}
+
+.painel-opcoes label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333;
+}
+
+.painel-opcoes .form-control {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.painel-opcoes .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.painel-opcoes select.form-control {
+    cursor: pointer;
+}
+
+/* Botões de Ação */
+.btn-block {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #000;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.btn-warning:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Associação Item (cores diferentes) */
+.associacao-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 4px solid #667eea;
+}
+
+
+
 

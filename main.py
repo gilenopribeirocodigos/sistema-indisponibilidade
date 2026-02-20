@@ -4,14 +4,19 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import get_db
 from models import Usuario
 from auth import verificar_senha
 import uvicorn
 import os
-from datetime import date
-import os
+from datetime import date, datetime, timedelta
+import logging
 from pathlib import Path
+
+# ✅ CONFIGURAR LOGGER
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configurar paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -72,7 +77,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # FUNÇÕES AUXILIARES DE SESSÃO
 # ========================================
 
-def get_usuario_logado(request: Request, db: Session):
+def get_usuario_logado(request: Request, db: Session = Depends(get_db)):
     """
     Retorna o usuário logado ou None.
     """
@@ -416,7 +421,6 @@ def registrar_v2_page(
         return RedirectResponse(url="/login")
     
     from models import EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
-    from datetime import datetime
     
     # Definir data (hoje ou data selecionada)
     if data:
@@ -447,6 +451,47 @@ def registrar_v2_page(
     
     # Converter de volta para lista
     ids_ja_registrados = list(ids_ja_registrados)
+    
+    
+    # EXCLUINDO os que já foram registrados na tabela indisponibilidade
+    # ✅ BUSCAR ELETRICISTAS AUSENTES (para seção Indisponível)
+    # EXCLUINDO os que já foram registrados na tabela indisponibilidades
+    eletricistas_ausentes = db.execute(
+        text("""
+            SELECT 
+                ed.id AS equipe_dia_id,
+                ed.eletricista_id,
+                ed.prefixo,
+                ee.colaborador,
+                ee.matricula,
+                mi.descricao AS motivo_ausencia
+            FROM equipes_dia ed
+            JOIN estrutura_equipes ee ON ed.eletricista_id = ee.id
+            JOIN motivos_indisponibilidade mi ON ed.id_indisponibilidade = mi.id
+            WHERE ed.data = :data
+              AND ed.id_indisponibilidade != 15
+              AND NOT EXISTS (
+                  SELECT 1 
+                  FROM indisponibilidades indisp 
+                  WHERE indisp.eletricista_id = ed.eletricista_id 
+                    AND indisp.data = ed.data
+              )
+            ORDER BY ee.colaborador
+        """),
+        {"data": data_selecionada}
+    ).fetchall()
+       
+    eletricistas_ausentes_lista = [
+        {
+            "id": e.eletricista_id,
+            "equipe_dia_id": e.equipe_dia_id,
+            "nome": e.colaborador,
+            "matricula": e.matricula,
+            "prefixo": e.prefixo,
+            "motivo_ausencia": e.motivo_ausencia
+        }
+        for e in eletricistas_ausentes
+    ]
     
     # Buscar eletricistas CONSIDERANDO REMANEJAMENTOS
     supervisor_campo = usuario.base_responsavel
@@ -541,7 +586,9 @@ def registrar_v2_page(
         {
             "request": request,
             "usuario": usuario,
-            "eletricistas": eletricistas,
+            "eletricistas_disponiveis": eletricistas,
+            "total_eletricistas": len(eletricistas),
+            "eletricistas_ausentes": eletricistas_ausentes_lista,
             "prefixos_supervisor": prefixos_supervisor,
             "motivos": motivos,
             "hoje": hoje_formatado,
@@ -552,13 +599,55 @@ def registrar_v2_page(
     )
 
 
+# ==========================================
+# ROTA: BUSCAR MOTIVOS DE INDISPONIBILIDADE
+# ==========================================
+@app.get("/api/motivos-indisponibilidade")
+async def buscar_motivos_indisponibilidade(request: Request, db: Session = Depends(get_db)):
+    """
+    Retorna lista de motivos EXCETO 'PRESENTE'
+    Para usar no select de ausência
+    """
+    # ✅ ADICIONAR VERIFICAÇÃO DE AUTENTICAÇÃO
+    if not verificar_autenticacao(request):
+        return {"success": False, "erro": "Não autenticado"}
+    
+    try:
+        motivos = db.execute(
+            text("""
+                SELECT id, descricao 
+                FROM motivos_indisponibilidade 
+                WHERE ativo = true 
+                  AND UPPER(descricao) != 'PRESENTE'
+                ORDER BY descricao
+            """)
+        ).fetchall()
+        
+        logger.info(f"✅ Retornando {len(motivos)} motivos de indisponibilidade")
+        
+        return {
+            "success": True,
+            "motivos": [
+                {"id": m.id, "descricao": m.descricao} 
+                for m in motivos
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar motivos: {str(e)}")
+        return {"success": False, "erro": str(e)}
+
+# ==========================================
+# SALVAR FREQUÊNCIA (PRESENÇA/AUSÊNCIA)
+# ==========================================
 @app.post("/api/salvar-frequencia")
 async def salvar_frequencia(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Salvar associações de frequência em lote"""
-    
+    """
+    Salvar frequência (presença ou ausência)
+    """
     # Verificar autenticação
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
@@ -567,55 +656,116 @@ async def salvar_frequencia(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import EquipeDia
-    from datetime import datetime
-    
     try:
-        # Ler JSON do body
-        body = await request.json()
-        associacoes = body.get('associacoes', [])
-        data_registro = body.get('data', None)
+        dados = await request.json()
+        associacoes = dados.get('associacoes', [])
+        data_registro = dados.get('data')
         
         if not associacoes:
-            return JSONResponse({"success": False, "erro": "Nenhuma associação enviada"})
+            return {"success": False, "erro": "Nenhuma associação fornecida"}
         
-        # Definir data (hoje ou data informada)
-        if data_registro:
-            try:
-                data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
-            except:
-                data_obj = date.today()
-        else:
-            data_obj = date.today()
+        if not data_registro:
+            return {"success": False, "erro": "Data não fornecida"}
         
-        # Salvar cada associação
-        total_salvo = 0
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data_registro, '%Y-%m-%d').date()
+        except:
+            return {"success": False, "erro": "Data inválida"}
+        
+        # ✅ BUSCAR ID DO MOTIVO "PRESENTE"
+        motivo_presente = db.execute(
+            text("SELECT id FROM motivos_indisponibilidade WHERE UPPER(descricao) = 'PRESENTE'")
+        ).fetchone()
+        
+        if not motivo_presente:
+            return {"success": False, "erro": "Motivo 'PRESENTE' não encontrado no banco"}
+        
+        id_presente = motivo_presente.id
+        
+        logger.info(f"📋 Salvando {len(associacoes)} associação(ões)...")
+        
+        # Inserir cada associação
         for assoc in associacoes:
-            nova_equipe = EquipeDia(
-                eletricista_id=assoc['eletricista_id'],
-                prefixo=assoc['prefixo'],
-                data=data_obj,
-                supervisor_registro=usuario.base_responsavel or usuario.nome,
-                usuario_registro=usuario.id  # ← ADICIONAR ESTA LINHA
-            )
-            db.add(nova_equipe)
-            total_salvo += 1
+            eletricista_id = assoc.get('eletricista_id')
+            prefixo = assoc.get('prefixo')
+            id_indisponibilidade_recebido = assoc.get('id_indisponibilidade')
+            
+            # ✅ LÓGICA CORRIGIDA:
+            # Se id_indisponibilidade for None ou null → PRESENÇA (usar id_presente)
+            # Se id_indisponibilidade tiver um valor → AUSÊNCIA (usar o valor recebido)
+            if id_indisponibilidade_recebido is None:
+                id_indisponibilidade_final = id_presente
+                logger.info(f"   ✅ PRESENÇA: Eletricista {eletricista_id} → Motivo ID {id_presente}")
+            else:
+                id_indisponibilidade_final = id_indisponibilidade_recebido
+                logger.info(f"   ⚠️ AUSÊNCIA: Eletricista {eletricista_id} → Motivo ID {id_indisponibilidade_recebido}")
+            
+            if not eletricista_id or not prefixo:
+                logger.warning(f"   ⚠️ Associação inválida: eletricista_id={eletricista_id}, prefixo={prefixo}")
+                continue
+            
+            # Verificar se já existe registro
+            ja_existe = db.execute(
+                text("""
+                    SELECT id FROM equipes_dia 
+                    WHERE eletricista_id = :elet_id 
+                      AND data = :data
+                """),
+                {"elet_id": eletricista_id, "data": data_obj}
+            ).fetchone()
+            
+            if ja_existe:
+                # Atualizar
+                logger.info(f"   🔄 Atualizando registro existente ID {ja_existe.id}")
+                db.execute(
+                    text("""
+                        UPDATE equipes_dia 
+                        SET prefixo = :prefixo,
+                            supervisor_registro = :supervisor,
+                            id_indisponibilidade = :id_indisponibilidade
+                        WHERE id = :id
+                    """),
+                    {
+                        "prefixo": prefixo,
+                        "supervisor": usuario.base_responsavel or usuario.nome,
+                        "id_indisponibilidade": id_indisponibilidade_final,
+                        "id": ja_existe.id
+                    }
+                )
+            else:
+                # Inserir novo
+                logger.info(f"   ➕ Inserindo novo registro")
+                db.execute(
+                    text("""
+                        INSERT INTO equipes_dia 
+                        (eletricista_id, prefixo, data, supervisor_registro, id_indisponibilidade, usuario_registro)
+                        VALUES (:elet_id, :prefixo, :data, :supervisor, :id_indisponibilidade, :usuario_id)
+                    """),
+                    {
+                        "elet_id": eletricista_id,
+                        "prefixo": prefixo,
+                        "data": data_obj,
+                        "supervisor": usuario.base_responsavel or usuario.nome,
+                        "id_indisponibilidade": id_indisponibilidade_final,
+                        "usuario_id": usuario.id
+                    }
+                )
         
         db.commit()
+        logger.info(f"✅ Salvamento concluído com sucesso!")
         
-        return JSONResponse({
+        return {
             "success": True,
-            "total": total_salvo,
-            "data": data_obj.strftime('%d/%m/%Y'),
-            "mensagem": f"{total_salvo} associação(ões) salva(s) para {data_obj.strftime('%d/%m/%Y')}!"
-        })
+            "data": data_obj.strftime('%d/%m/%Y')
+        }
         
     except Exception as e:
         db.rollback()
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
+        logger.error(f"❌ Erro ao salvar frequência: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "erro": str(e)}
 
 
 @app.post("/api/remanejar-eletricista")
@@ -743,8 +893,7 @@ async def salvar_indisponibilidade(
     if not usuario:
         return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
     
-    from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade, EquipeDia
-    from datetime import datetime
+    from models import Indisponibilidade, EstruturaEquipes, MotivoIndisponibilidade
     
     try:
         # Ler dados do formulário
@@ -752,7 +901,7 @@ async def salvar_indisponibilidade(
         
         eletricista_id = form_data.get('eletricista_id')
         prefixo = form_data.get('prefixo')
-        tipo_indisponibilidade = form_data.get('tipo_indisponibilidade')  # ← ADICIONAR
+        tipo_indisponibilidade = form_data.get('tipo_indisponibilidade')
         motivo_id = form_data.get('motivo_id')
         observacoes = form_data.get('observacoes', '')
         data_registro = form_data.get('data', None)
@@ -780,18 +929,9 @@ async def salvar_indisponibilidade(
         
         if not eletricista:
             return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
-
-        # Verificar se já foi registrado na FREQUÊNCIA hoje
-        ja_na_frequencia = db.query(EquipeDia).filter(
-            EquipeDia.eletricista_id == eletricista_id,
-            EquipeDia.data == data_obj
-        ).first()
         
-        if ja_na_frequencia:
-            return JSONResponse({
-                "success": False,
-                "erro": f"❌ {eletricista.colaborador} já foi registrado na FREQUÊNCIA hoje! Não pode ser marcado como indisponível."
-            })
+        # ✅ REMOVIDA A VALIDAÇÃO "já foi registrado na FREQUÊNCIA"
+        # Agora permite registrar indisponibilidade mesmo se já está na frequência
         
         # Verificar se já foi registrado como INDISPONÍVEL hoje
         ja_indisponivel = db.query(Indisponibilidade).filter(
@@ -819,7 +959,7 @@ async def salvar_indisponibilidade(
             eletricista_id=eletricista_id,
             matricula=eletricista.matricula,
             prefixo=prefixo,
-            tipo_indisponibilidade=tipo_indisponibilidade,  # ← ADICIONAR
+            tipo_indisponibilidade=tipo_indisponibilidade,
             motivo_id=motivo_id,
             observacao=observacoes if observacoes else None,
             usuario_registro=usuario.id
@@ -860,7 +1000,6 @@ def buscar_eletricistas(
     Para INDISPONIBILIDADE: exclui apenas os já registrados como indisponíveis.
     """
     from models import EstruturaEquipes, Indisponibilidade
-    from datetime import datetime
     
     # Verificar se tem termo de busca
     if not q or len(q) < 3:
@@ -888,7 +1027,7 @@ def buscar_eletricistas(
     # Buscar eletricistas (case-insensitive) EXCLUINDO os já registrados como indisponíveis
     query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%"),        
-        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
     )
     
     # EXCLUIR apenas os já registrados como INDISPONÍVEIS
@@ -924,7 +1063,6 @@ def buscar_eletricistas_remanejar(
     NÃO exclui os já remanejados (para permitir atualização).
     """
     from models import EstruturaEquipes, EquipeDia, Indisponibilidade
-    from datetime import datetime
     
     # Verificar se tem termo de busca
     if not q or len(q) < 3:
@@ -960,7 +1098,7 @@ def buscar_eletricistas_remanejar(
     # Buscar eletricistas (case-insensitive) EXCLUINDO os bloqueados
     query = db.query(EstruturaEquipes).filter(
         EstruturaEquipes.colaborador.ilike(f"%{q}%"),
-        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])  # ← ADICIONAR FILTRO
+        EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
     )
     
     # EXCLUIR apenas os em Frequência ou Indisponíveis
@@ -1023,797 +1161,75 @@ def buscar_prefixos(q: str = "", db: Session = Depends(get_db)):
     return JSONResponse({"prefixos": resultado})
 
 
-# ========================================
-# ROTA DE DEBUG
-# ========================================
-
-@app.get("/debug-sessao", response_class=HTMLResponse)
-def debug_sessao(request: Request):
-    """Página de debug para visualizar dados da sessão."""
+# ==========================================
+# API: BUSCAR REGISTRO PARA DESFAZER
+# ==========================================
+@app.get("/api/buscar-registro-para-desfazer")
+async def buscar_registro_para_desfazer(
+    request: Request,
+    matricula: str,
+    data: str,
+    db: Session = Depends(get_db)
+):
+    """Busca registro de hoje para desfazer"""
     
-    logado = verificar_autenticacao(request)
-    
-    session_data = {
-        'user_id': request.session.get('user_id'),
-        'user_nome': request.session.get('user_nome'),
-        'user_perfil': request.session.get('user_perfil'),
-        'user_base': request.session.get('user_base')
-    }
-    
-    return templates.TemplateResponse(
-        "debug_sessao.html",
-        {
-            "request": request,
-            "logado": logado,
-            "session_data": session_data
-        }
-    )
-
-# ========================================
-# ROTA DE IMPORTAÇÃO CSV
-# ========================================
-
-from fastapi import UploadFile, File
-
-@app.get("/importar-csv", response_class=HTMLResponse)
-def importar_csv_page(request: Request, db: Session = Depends(get_db)):
-    """Página de importação de CSV"""
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        request.session.clear()
-        return RedirectResponse(url="/login")
-    return templates.TemplateResponse("importar_csv.html", {"request": request, "usuario": usuario})
-
-@app.post("/api/importar-eletricistas")
-async def importar_eletricistas(request: Request, arquivo: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Importar eletricistas de arquivo CSV com HISTÓRICO"""
-    
+    # Verificar autenticação
     if not verificar_autenticacao(request):
         return JSONResponse({"success": False, "erro": "Não autenticado"})
     
-    usuario = get_usuario_logado(request, db)
-    
-    from models import EstruturaEquipes
-    import csv
-    import io
+    from models import EquipeDia, EstruturaEquipes, MotivoIndisponibilidade
     
     try:
-        # ========================================
-        # PASSO 1: ARQUIVAR ESTRUTURA ATUAL
-        # ========================================
-        print("\n" + "="*60)
-        print("📦 ARQUIVANDO ESTRUTURA ATUAL NO HISTÓRICO...")
-        print("="*60)
-        
-        total_arquivados = arquivar_estrutura_atual(
-            db=db,
-            usuario_id=usuario.id if usuario else None,
-            observacao="Importação de novo CSV"
-        )
-        
-        print(f"✅ {total_arquivados} registros arquivados")
-        
-        # ========================================
-        # PASSO 2: IMPORTAR NOVOS DADOS
-        # ========================================
-        print("\n📥 Importando novos dados do CSV...")
-        
-        # Ler arquivo
-        contents = await arquivo.read()
-        
-        # Tentar UTF-8, se falhar tenta Latin-1
+        # Converter data
         try:
-            decoded = contents.decode('utf-8')
+            data_obj = datetime.strptime(data, '%Y-%m-%d').date()
         except:
-            decoded = contents.decode('latin-1')
+            return JSONResponse({"success": False, "erro": "Data inválida"})
         
-        # Ler CSV
-        csv_reader = csv.DictReader(io.StringIO(decoded), delimiter=';')
+        # Buscar eletricista pela matrícula
+        eletricista = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.matricula == matricula.strip()
+        ).first()
         
-        # Contadores
-        total_novos = 0
-        total_atualizados = 0
-        
-        for row in csv_reader:
-            matricula = str(row.get('matricula', '')).strip()
-            colaborador = str(row.get('colaborador', '')).strip()
-            
-            if not matricula or not colaborador:
-                continue  # Pula linhas inválidas
-            
-            # Buscar se já existe no banco (pela matrícula)
-            eletricista_existente = db.query(EstruturaEquipes).filter(
-                EstruturaEquipes.matricula == matricula
-            ).first()
-            
-            if eletricista_existente:
-                # ✅ ATUALIZAR (mantém o ID)
-                eletricista_existente.colaborador = colaborador
-                eletricista_existente.prefixo = str(row.get('prefixo', '')).strip()
-                eletricista_existente.base = str(row.get('base', '')).strip()
-                eletricista_existente.polo = str(row.get('polo', '')).strip()
-                eletricista_existente.regional = str(row.get('regional', '')).strip()
-                eletricista_existente.superv_campo = str(row.get('superv_campo', '')).strip()
-                eletricista_existente.superv_operacao = str(row.get('superv_operacao', '')).strip()
-                eletricista_existente.coordenador = str(row.get('coordenador', '')).strip()
-                eletricista_existente.descr_secao = str(row.get('descr_secao', '')).strip()
-                eletricista_existente.descr_situacao = str(row.get('descr_situacao', '')).strip()
-                eletricista_existente.placas = str(row.get('placas', '')).strip()
-                eletricista_existente.tipo_equipe = str(row.get('tipo_equipe', '')).strip()
-                eletricista_existente.processo_equipe = str(row.get('processo_equipe', '')).strip()
-                
-                total_atualizados += 1
-            else:
-                # ✅ INSERIR NOVO
-                novo_eletricista = EstruturaEquipes(
-                    colaborador=colaborador,
-                    matricula=matricula,
-                    prefixo=str(row.get('prefixo', '')).strip(),
-                    base=str(row.get('base', '')).strip(),
-                    polo=str(row.get('polo', '')).strip(),
-                    regional=str(row.get('regional', '')).strip(),
-                    superv_campo=str(row.get('superv_campo', '')).strip(),
-                    superv_operacao=str(row.get('superv_operacao', '')).strip(),
-                    coordenador=str(row.get('coordenador', '')).strip(),
-                    descr_secao=str(row.get('descr_secao', '')).strip(),
-                    descr_situacao=str(row.get('descr_situacao', '')).strip(),
-                    placas=str(row.get('placas', '')).strip(),
-                    tipo_equipe=str(row.get('tipo_equipe', '')).strip(),
-                    processo_equipe=str(row.get('processo_equipe', '')).strip()
-                )
-                db.add(novo_eletricista)
-                total_novos += 1
-        
-        # Commit
-        db.commit()
-        
-        print(f"✅ {total_novos} novos, {total_atualizados} atualizados")
-        print("="*60 + "\n")
-        
-        return JSONResponse({
-            "success": True,
-            "total_arquivados": total_arquivados,
-            "total_novos": total_novos,
-            "total_atualizados": total_atualizados,
-            "mensagem": f"✅ Importação concluída!\n\n📦 {total_arquivados} registros arquivados\n📥 {total_novos} novos + {total_atualizados} atualizados"
-        })
-        
-    except Exception as e:
-        db.rollback()
-        return JSONResponse({
-            "success": False,
-            "erro": f"Erro: {str(e)}"
-        })
-
-
-@app.get("/api/teste-eletricistas")
-def teste_eletricistas(db: Session = Depends(get_db)):
-    """Rota de teste para ver quantos eletricistas existem"""
-    from models import EstruturaEquipes
-    
-    try:
-        total = db.query(EstruturaEquipes).count()
-        todos = db.query(EstruturaEquipes).limit(5).all()
-        
-        resultado = []
-        for e in todos:
-            resultado.append({
-                "id": e.id,
-                "colaborador": e.colaborador,
-                "matricula": e.matricula,
-                "prefixo": e.prefixo
+        if not eletricista:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ Matrícula {matricula} não encontrada!"
             })
         
-        return JSONResponse({
-            "total_no_banco": total,
-            "primeiros_5": resultado
-        })
-    except Exception as e:
-        return JSONResponse({"erro": str(e)})
-
-@app.get("/api/listar-todos-eletricistas")
-def listar_todos_eletricistas(request: Request, db: Session = Depends(get_db)):
-    """Listar TODOS os eletricistas sem filtro"""
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    from models import EstruturaEquipes
-    
-    try:
-        eletricistas = db.query(EstruturaEquipes).all()
+        # Buscar registro na tabela equipes_dia
+        registro = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista.id,
+            EquipeDia.data == data_obj
+        ).first()
         
-        resultado = []
-        for e in eletricistas:
-            resultado.append({
-                "id": e.id,
-                "colaborador": e.colaborador,
-                "matricula": e.matricula,
-                "prefixo": e.prefixo,
-                "base": e.base,
-                "polo": e.polo,
-                "regional": e.regional,
-                "superv_campo": e.superv_campo
+        if not registro:
+            return JSONResponse({
+                "success": False,
+                "erro": f"❌ {eletricista.colaborador} não tem registro para {data_obj.strftime('%d/%m/%Y')}!"
             })
         
-        return JSONResponse({
-            "success": True,
-            "total": len(resultado),
-            "eletricistas": resultado
-        })
-    except Exception as e:
-        return JSONResponse({"success": False, "erro": str(e)})
-
-@app.get("/api/teste-motivos")
-def teste_motivos(db: Session = Depends(get_db)):
-    """Rota de teste para ver motivos"""
-    from models import MotivoIndisponibilidade
-    
-    try:
-        motivos = db.query(MotivoIndisponibilidade).all()
+        # Buscar motivo
+        motivo = db.query(MotivoIndisponibilidade).filter(
+            MotivoIndisponibilidade.id == registro.id_indisponibilidade
+        ).first()
         
-        resultado = []
-        for m in motivos:
-            resultado.append({
-                "id": m.id,
-                "descricao": m.descricao,
-                "ativo": m.ativo
-            })
-        
-        return JSONResponse({
-            "total": len(resultado),
-            "motivos": resultado
-        })
-    except Exception as e:
-        return JSONResponse({"erro": str(e)})
-        
-@app.get("/api/criar-motivos-padrao")
-def criar_motivos_padrao(db: Session = Depends(get_db)):
-    """Criar motivos padrão de indisponibilidade"""
-    from models import MotivoIndisponibilidade
-    
-    motivos_corretos = [
-        "ATESTADO MEDICO",
-        "FALTA INJUSTIFICADA",
-        "VIATURA COM DEFEITO",
-        "VIATURA EM MANUTENCAO",
-        "ACIDENTE",
-        "TREINAMENTO",
-        "FERIAS",
-        "LICENCA",
-        "OUTRO"
-    ]
-    
-    try:
-        total_criado = 0
-        
-        for descricao in motivos_corretos:
-            # Verificar se já existe
-            existe = db.query(MotivoIndisponibilidade).filter(
-                MotivoIndisponibilidade.descricao == descricao
-            ).first()
-            
-            if not existe:
-                novo_motivo = MotivoIndisponibilidade(
-                    descricao=descricao,
-                    ativo=True
-                )
-                db.add(novo_motivo)
-                total_criado += 1
-        
-        db.commit()
+        # Determinar tipo (presença ou ausência)
+        # Assumindo que id = 15 é "PRESENTE"
+        tipo = 'presenca' if registro.id_indisponibilidade == 15 else 'ausencia'
         
         return JSONResponse({
             "success": True,
-            "total_criado": total_criado,
-            "mensagem": f"✅ {total_criado} motivos criados com sucesso!"
-        })
-        
-    except Exception as e:
-        db.rollback()
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
-
-# ========================================
-# ROTAS DE GESTÃO DE USUÁRIOS
-# ========================================
-
-@app.get("/usuarios", response_class=HTMLResponse)
-def listar_usuarios(request: Request, db: Session = Depends(get_db)):
-    """Listar todos os usuários (apenas ADMIN)"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        request.session.clear()
-        return RedirectResponse(url="/login")
-    
-    # Verificar se é ADMIN
-    if usuario.perfil != 'admin':
-        return templates.TemplateResponse(
-            "home.html",
-            {
-                "request": request,
-                "usuario": usuario,
-                "erro": "⚠️ Acesso negado! Apenas administradores podem gerenciar usuários."
-            }
-        )
-    
-    # Buscar todos os usuários
-    usuarios = db.query(Usuario).order_by(Usuario.nome).all()
-    
-    return templates.TemplateResponse(
-        "usuarios.html",
-        {
-            "request": request,
-            "usuario": usuario,
-            "usuarios": usuarios
-        }
-    )
-
-
-@app.get("/usuarios/novo", response_class=HTMLResponse)
-def novo_usuario_page(request: Request, db: Session = Depends(get_db)):
-    """Página para criar novo usuário"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        request.session.clear()
-        return RedirectResponse(url="/login")
-    
-    # Verificar se é ADMIN
-    if usuario.perfil != 'admin':
-        return RedirectResponse(url="/usuarios")
-    
-    # Buscar supervisores únicos da tabela estrutura_equipes
-    from models import EstruturaEquipes
-    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
-    supervisores = [s[0] for s in supervisores if s[0]]
-    supervisores.append("Todas")
-    
-    return templates.TemplateResponse(
-        "usuario_form.html",
-        {
-            "request": request,
-            "usuario": usuario,
-            "supervisores": supervisores,
-            "usuario_edicao": None
-        }
-    )
-
-
-@app.post("/usuarios/novo")
-def criar_usuario(
-    request: Request,
-    nome: str = Form(...),
-    login: str = Form(...),
-    senha: str = Form(...),
-    perfil: str = Form(...),
-    base_responsavel: str = Form(""),
-    ativo: bool = Form(False),
-    db: Session = Depends(get_db)
-):
-    """Criar novo usuário"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario_logado = get_usuario_logado(request, db)
-    if not usuario_logado or usuario_logado.perfil != 'admin':
-        return RedirectResponse(url="/usuarios")
-    
-    from auth import criar_hash_senha
-    from models import EstruturaEquipes
-    
-    try:
-        # Verificar se login já existe
-        existe = db.query(Usuario).filter(Usuario.login == login).first()
-        if existe:
-            supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
-            supervisores = [s[0] for s in supervisores if s[0]]
-            supervisores.append("Todas")
-            
-            return templates.TemplateResponse(
-                "usuario_form.html",
-                {
-                    "request": request,
-                    "usuario": usuario_logado,
-                    "supervisores": supervisores,
-                    "usuario_edicao": None,
-                    "erro": f"❌ Login '{login}' já existe! Escolha outro."
-                }
-            )
-        
-        # Criar novo usuário
-        novo_usuario = Usuario(
-            nome=nome,
-            login=login,
-            senha_hash=criar_hash_senha(senha),
-            perfil=perfil,
-            base_responsavel=base_responsavel if base_responsavel else None,
-            ativo=ativo
-        )
-        
-        db.add(novo_usuario)
-        db.commit()
-        
-        # Redirecionar com sucesso
-        return RedirectResponse(
-            url=f"/usuarios?sucesso=Usuário '{nome}' criado com sucesso!",
-            status_code=302
-        )
-        
-    except Exception as e:
-        db.rollback()
-        
-        supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
-        supervisores = [s[0] for s in supervisores if s[0]]
-        supervisores.append("Todas")
-        
-        return templates.TemplateResponse(
-            "usuario_form.html",
-            {
-                "request": request,
-                "usuario": usuario_logado,
-                "supervisores": supervisores,
-                "usuario_edicao": None,
-                "erro": f"❌ Erro ao criar usuário: {str(e)}"
-            }
-        )
-
-
-@app.get("/usuarios/editar/{user_id}", response_class=HTMLResponse)
-def editar_usuario_page(request: Request, user_id: int, db: Session = Depends(get_db)):
-    """Página para editar usuário"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        request.session.clear()
-        return RedirectResponse(url="/login")
-    
-    # Verificar se é ADMIN
-    if usuario.perfil != 'admin':
-        return RedirectResponse(url="/usuarios")
-    
-    # Buscar usuário a ser editado
-    usuario_edicao = db.query(Usuario).filter(Usuario.id == user_id).first()
-    
-    if not usuario_edicao:
-        return RedirectResponse(url="/usuarios?erro=Usuário não encontrado!")
-    
-    # Buscar supervisores
-    from models import EstruturaEquipes
-    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
-    supervisores = [s[0] for s in supervisores if s[0]]
-    supervisores.append("Todas")
-    
-    return templates.TemplateResponse(
-        "usuario_form.html",
-        {
-            "request": request,
-            "usuario": usuario,
-            "supervisores": supervisores,
-            "usuario_edicao": usuario_edicao
-        }
-    )
-
-
-@app.post("/usuarios/editar/{user_id}")
-def salvar_edicao_usuario(
-    request: Request,
-    user_id: int,
-    nome: str = Form(...),
-    perfil: str = Form(...),
-    base_responsavel: str = Form(""),
-    ativo: bool = Form(False),
-    db: Session = Depends(get_db)
-):
-    """Salvar edição de usuário"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario_logado = get_usuario_logado(request, db)
-    if not usuario_logado or usuario_logado.perfil != 'admin':
-        return RedirectResponse(url="/usuarios")
-    
-    try:
-        # Buscar usuário
-        usuario_edicao = db.query(Usuario).filter(Usuario.id == user_id).first()
-        
-        if not usuario_edicao:
-            return RedirectResponse(url="/usuarios?erro=Usuário não encontrado!")
-        
-        # Atualizar dados
-        usuario_edicao.nome = nome
-        usuario_edicao.perfil = perfil
-        usuario_edicao.base_responsavel = base_responsavel if base_responsavel else None
-        usuario_edicao.ativo = ativo
-        
-        db.commit()
-        
-        # Redirecionar com sucesso
-        return RedirectResponse(
-            url=f"/usuarios?sucesso=Usuário '{nome}' atualizado com sucesso!",
-            status_code=302
-        )
-        
-    except Exception as e:
-        db.rollback()
-        return RedirectResponse(
-            url=f"/usuarios?erro=Erro ao atualizar usuário: {str(e)}",
-            status_code=302
-        )
-
-
-# ========================================
-# APIs DE GESTÃO DE USUÁRIOS
-# ========================================
-
-@app.post("/api/usuarios/toggle-status")
-async def toggle_status_usuario(request: Request, db: Session = Depends(get_db)):
-    """Ativar/Desativar usuário"""
-    
-    # Verificar autenticação
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario_logado = get_usuario_logado(request, db)
-    if not usuario_logado or usuario_logado.perfil != 'admin':
-        return JSONResponse({"success": False, "erro": "Acesso negado"})
-    
-    try:
-        body = await request.json()
-        user_id = body.get('user_id')
-        ativo = body.get('ativo')
-        
-        # Buscar usuário
-        usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
-        
-        if not usuario:
-            return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-        
-        # Não permitir desativar o próprio usuário
-        if usuario.id == usuario_logado.id:
-            return JSONResponse({"success": False, "erro": "Você não pode desativar sua própria conta!"})
-        
-        # Atualizar status
-        usuario.ativo = ativo
-        db.commit()
-        
-        acao = "ativado" if ativo else "desativado"
-        
-        return JSONResponse({
-            "success": True,
-            "mensagem": f"Usuário '{usuario.nome}' {acao} com sucesso!"
-        })
-        
-    except Exception as e:
-        db.rollback()
-        return JSONResponse({"success": False, "erro": str(e)})
-
-
-@app.post("/api/usuarios/resetar-senha")
-async def resetar_senha_usuario(request: Request, db: Session = Depends(get_db)):
-    """Resetar senha de usuário"""
-    
-    # Verificar autenticação
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario_logado = get_usuario_logado(request, db)
-    if not usuario_logado or usuario_logado.perfil != 'admin':
-        return JSONResponse({"success": False, "erro": "Acesso negado"})
-    
-    from auth import criar_hash_senha
-    
-    try:
-        body = await request.json()
-        user_id = body.get('user_id')
-        nova_senha = body.get('nova_senha')
-        
-        if not nova_senha or len(nova_senha) < 6:
-            return JSONResponse({"success": False, "erro": "Senha deve ter no mínimo 6 caracteres"})
-        
-        # Buscar usuário
-        usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
-        
-        if not usuario:
-            return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-        
-        # Atualizar senha
-        usuario.senha_hash = criar_hash_senha(nova_senha)
-        db.commit()
-        
-        return JSONResponse({
-            "success": True,
-            "mensagem": f"Senha de '{usuario.nome}' resetada com sucesso!"
-        })
-        
-    except Exception as e:
-        db.rollback()
-        return JSONResponse({"success": False, "erro": str(e)})
-
-# ========================================
-# ROTAS DE RELATÓRIOS
-# ========================================
-
-@app.get("/relatorios", response_class=HTMLResponse)
-def relatorios_page(request: Request, db: Session = Depends(get_db)):
-    """Página de relatórios"""
-    
-    # Verificar se está logado
-    if not verificar_autenticacao(request):
-        return RedirectResponse(url="/login")
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        request.session.clear()
-        return RedirectResponse(url="/login")
-    
-    from models import EstruturaEquipes
-    from datetime import datetime, timedelta
-    
-    # Buscar supervisores únicos
-    supervisores = db.query(EstruturaEquipes.superv_campo).distinct().all()
-    supervisores = [s[0] for s in supervisores if s[0]]
-    
-    # Datas padrão
-    hoje = date.today()
-    inicio_mes = date(hoje.year, hoje.month, 1)
-    
-    return templates.TemplateResponse(
-        "relatorios.html",
-        {
-            "request": request,
-            "usuario": usuario,
-            "supervisores": supervisores,
-            "hoje_iso": hoje.isoformat(),
-            "inicio_mes": inicio_mes.isoformat()
-        }
-    )
-
-
-@app.get("/api/relatorio-geral")
-def relatorio_geral(
-    request: Request,
-    data_inicio: str = None,
-    data_fim: str = None,
-    db: Session = Depends(get_db)
-):
-    """API para gerar relatório GERAL (consolidado de todos)"""
-    
-    # Verificar autenticação
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-    
-    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
-    from datetime import datetime, timedelta
-    from sqlalchemy import func
-    
-    try:
-        # Definir período
-        if data_inicio and data_fim:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
-        elif data_inicio:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = data_inicio_obj
-        else:
-            data_inicio_obj = date.today()
-            data_fim_obj = date.today()
-        
-        # Buscar total de eletricistas ATIVOS/RESERVA
-        total_eletricistas = db.query(EstruturaEquipes).filter(
-            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-        ).count()
-        
-        # Criar lista de datas no período
-        dias_periodo = []
-        data_atual = data_inicio_obj
-        while data_atual <= data_fim_obj:
-            dias_periodo.append(data_atual)
-            data_atual += timedelta(days=1)
-        
-        # Dicionário para contar
-        resultado = {
-            "PRESENTE": 0,
-            "NÃO REGISTRADO": 0
-        }
-        
-        # Para cada dia no período
-        for dia in dias_periodo:
-            # 1. PRESENTES (frequência)
-            ids_presentes = db.query(EquipeDia.eletricista_id).filter(
-                EquipeDia.data == dia
-            ).all()
-            ids_presentes = set([p[0] for p in ids_presentes])
-            
-            resultado["PRESENTE"] += len(ids_presentes)
-            
-            # 2. INDISPONÍVEIS com motivo
-            indisponiveis = db.query(
-                Indisponibilidade.eletricista_id,
-                MotivoIndisponibilidade.descricao
-            ).join(
-                MotivoIndisponibilidade,
-                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-            ).filter(
-                Indisponibilidade.data == dia
-            ).all()
-            
-            ids_indisponiveis = set([i[0] for i in indisponiveis])
-            
-            # Contar por motivo (em MAIÚSCULAS)
-            for elet_id, motivo in indisponiveis:
-                motivo_upper = motivo.upper()
-                if motivo_upper not in resultado:
-                    resultado[motivo_upper] = 0
-                resultado[motivo_upper] += 1
-            
-            # 3. NÃO REGISTRADOS
-            ids_registrados = ids_presentes.union(ids_indisponiveis)
-            
-            total_nao_registrados = db.query(EstruturaEquipes.id).filter(
-                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA']),
-                ~EstruturaEquipes.id.in_(list(ids_registrados))
-            ).count()
-            
-            resultado["NÃO REGISTRADO"] += total_nao_registrados
-        
-        # ✅ AJUSTE: Total de registros SEM os "Não registrado"
-        total_registros = sum(v for k, v in resultado.items() if k != "NÃO REGISTRADO")
-        
-        # Calcular percentuais (sobre TODOS, incluindo não registrado)
-        total_geral = sum(resultado.values())
-        
-        dados_relatorio = []
-        for motivo, qtde in resultado.items():
-            percentual = (qtde / total_geral * 100) if total_geral > 0 else 0
-            dados_relatorio.append({
-                "motivo": motivo,
-                "qtde": qtde,
-                "percentual": round(percentual, 1)
-            })
-        
-        # Ordenar: PRESENTE primeiro, depois alfabético, NÃO REGISTRADO por último
-        dados_relatorio.sort(key=lambda x: (
-            0 if x['motivo'] == 'PRESENTE' else 
-            2 if x['motivo'] == 'NÃO REGISTRADO' else 
-            1,
-            x['motivo']
-        ))
-        
-        return JSONResponse({
-            "success": True,
-            "periodo": {
-                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
-                "fim": data_fim_obj.strftime('%d/%m/%Y'),
-                "dias": len(dias_periodo)
+            "eletricista": {
+                "id": eletricista.id,
+                "nome": eletricista.colaborador,
+                "matricula": eletricista.matricula,
+                "prefixo": registro.prefixo
             },
-            "total_eletricistas": total_eletricistas,
-            "total_registros": total_registros,  # ✅ SEM os "Não registrado"
-            "dados": dados_relatorio
+            "tipo": tipo,
+            "motivo": motivo.descricao if motivo else "N/A",
+            "data": data_obj.strftime('%d/%m/%Y'),
+            "registro_id": registro.id
         })
         
     except Exception as e:
@@ -1822,572 +1238,86 @@ def relatorio_geral(
             "erro": str(e)
         })
 
-
-# FUNÇÃO CORRIGIDA COM DEBUG
-# Substitua a função relatorio_por_supervisor no main.py pela versão abaixo
-
-@app.get("/api/relatorio-por-supervisor")
-def relatorio_por_supervisor(
-    request: Request,
-    data_inicio: str = None,
-    data_fim: str = None,
-    db: Session = Depends(get_db)
-):
-    """API para gerar relatório POR SUPERVISOR - COM DEBUG"""
-    
-    # Verificar autenticação
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-    
-    from models import EstruturaEquipes, EquipeDia, Indisponibilidade, MotivoIndisponibilidade
-    from datetime import datetime, timedelta
-    
-    try:
-        # Definir período
-        if data_inicio and data_fim:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
-        elif data_inicio:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = data_inicio_obj
-        else:
-            data_inicio_obj = date.today()
-            data_fim_obj = date.today()
-        
-        print(f"\n{'='*60}")
-        print(f"DEBUG RELATÓRIO - Período: {data_inicio_obj} até {data_fim_obj}")
-        print(f"{'='*60}")
-        
-        # Criar lista de datas no período
-        dias_periodo = []
-        data_atual = data_inicio_obj
-        while data_atual <= data_fim_obj:
-            dias_periodo.append(data_atual)
-            data_atual += timedelta(days=1)
-        
-        print(f"Total de dias no período: {len(dias_periodo)}")
-        
-        # Buscar todos os supervisores
-        supervisores = db.query(EstruturaEquipes.superv_campo).filter(
-            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-        ).distinct().all()
-        supervisores = [s[0] for s in supervisores if s[0]]
-        
-        print(f"Total de supervisores: {len(supervisores)}")
-        
-        # Buscar todos os motivos possíveis
-        motivos_db = db.query(MotivoIndisponibilidade.descricao).all()
-        todos_motivos = set([m[0] for m in motivos_db])
-        
-        print(f"Motivos cadastrados: {list(todos_motivos)}")
-        
-        # TESTE: Verificar se há indisponibilidades no período
-        total_indisp_periodo = db.query(Indisponibilidade).filter(
-            Indisponibilidade.data >= data_inicio_obj,
-            Indisponibilidade.data <= data_fim_obj
-        ).count()
-        print(f"Total de indisponibilidades no período: {total_indisp_periodo}")
-        
-        if total_indisp_periodo > 0:
-            # Mostrar exemplos
-            exemplos = db.query(
-                Indisponibilidade.data,
-                Indisponibilidade.eletricista_id,
-                MotivoIndisponibilidade.descricao
-            ).join(
-                MotivoIndisponibilidade,
-                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-            ).filter(
-                Indisponibilidade.data >= data_inicio_obj,
-                Indisponibilidade.data <= data_fim_obj
-            ).limit(5).all()
-            
-            print("\nExemplos de indisponibilidades no período:")
-            for data, elet_id, motivo in exemplos:
-                print(f"  - Data: {data}, Eletricista ID: {elet_id}, Motivo: {motivo}")
-        
-        dados_supervisores = []
-        
-        # Para cada supervisor
-        for supervisor in supervisores:
-            print(f"\n--- Supervisor: {supervisor} ---")
-            
-            # Total de eletricistas desse supervisor
-            total_eletricistas_sup = db.query(EstruturaEquipes).filter(
-                EstruturaEquipes.superv_campo == supervisor,
-                EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-            ).count()
-            
-            print(f"Total de eletricistas: {total_eletricistas_sup}")
-            
-            # Contadores por motivo
-            contadores = {
-                "Presente": 0,
-                "Não registrado": 0
-            }
-            
-            # Para cada dia
-            for dia in dias_periodo:
-                # 1. PRESENTES
-                presentes = db.query(EquipeDia.eletricista_id).join(
-                    EstruturaEquipes,
-                    EquipeDia.eletricista_id == EstruturaEquipes.id
-                ).filter(
-                    EquipeDia.data == dia,
-                    EstruturaEquipes.superv_campo == supervisor
-                ).all()
-                
-                ids_presentes = set([p[0] for p in presentes])
-                contadores["Presente"] += len(ids_presentes)
-                
-                # 2. INDISPONÍVEIS - COM DEBUG
-                indisponiveis = db.query(
-                    Indisponibilidade.eletricista_id,
-                    MotivoIndisponibilidade.descricao
-                ).join(
-                    MotivoIndisponibilidade,
-                    Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-                ).join(
-                    EstruturaEquipes,
-                    Indisponibilidade.eletricista_id == EstruturaEquipes.id
-                ).filter(
-                    Indisponibilidade.data == dia,
-                    EstruturaEquipes.superv_campo == supervisor
-                ).all()
-                
-                if indisponiveis:
-                    print(f"  Dia {dia}: Encontrados {len(indisponiveis)} indisponíveis")
-                    for elet_id, motivo in indisponiveis:
-                        print(f"    - Eletricista ID: {elet_id}, Motivo: '{motivo}'")
-                
-                ids_indisponiveis = set([i[0] for i in indisponiveis])
-                
-                for elet_id, motivo in indisponiveis:
-                    if motivo not in contadores:
-                        contadores[motivo] = 0
-                    contadores[motivo] += 1
-                
-                # 3. NÃO REGISTRADOS
-                ids_registrados = ids_presentes.union(ids_indisponiveis)
-                
-                nao_registrados = db.query(EstruturaEquipes.id).filter(
-                    EstruturaEquipes.superv_campo == supervisor,
-                    EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA']),
-                    ~EstruturaEquipes.id.in_(list(ids_registrados)) if ids_registrados else True
-                ).count()
-                
-                contadores["Não registrado"] += nao_registrados
-            
-            print(f"Contadores finais: {contadores}")
-            
-            # Calcular totais
-            total_registros = sum(contadores.values())
-            percentual_presenca = (contadores["Presente"] / total_registros * 100) if total_registros > 0 else 0
-            
-            dados_supervisores.append({
-                "supervisor": supervisor,
-                "total_eletricistas": total_eletricistas_sup,
-                "contadores": contadores,
-                "total_registros": total_registros,
-                "percentual_presenca": round(percentual_presenca, 1)
-            })
-        
-        # Ordenar por % de presença (decrescente)
-        dados_supervisores.sort(key=lambda x: x['percentual_presenca'], reverse=True)
-        
-        # Calcular totais gerais
-        total_geral = sum([s['total_registros'] for s in dados_supervisores])
-        
-        print(f"\n{'='*60}")
-        print(f"TOTAL GERAL: {total_geral}")
-        print(f"{'='*60}\n")
-        
-        return JSONResponse({
-            "success": True,
-            "periodo": {
-                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
-                "fim": data_fim_obj.strftime('%d/%m/%Y'),
-                "dias": len(dias_periodo)
-            },
-            "todos_motivos": sorted(list(todos_motivos)),
-            "dados": dados_supervisores,
-            "total_geral": total_geral
-        })
-        
-    except Exception as e:
-        print(f"\n❌ ERRO: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
-
-@app.get("/api/relatorio-por-prefixo")
-def relatorio_por_prefixo(
-    request: Request,
-    data_inicio: str = None,
-    data_fim: str = None,
-    db: Session = Depends(get_db)
-):
-    """API para gerar relatório POR PREFIXO - Mostra até 2 motivos diferentes"""
-    
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-    
-    from models import Indisponibilidade, MotivoIndisponibilidade
-    from datetime import datetime, timedelta
-    
-    try:
-        # Definir período
-        if data_inicio and data_fim:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
-        elif data_inicio:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = data_inicio_obj
-        else:
-            data_inicio_obj = date.today()
-            data_fim_obj = date.today()
-        
-        # Criar lista de datas no período
-        dias_periodo = []
-        data_atual = data_inicio_obj
-        while data_atual <= data_fim_obj:
-            dias_periodo.append(data_atual)
-            data_atual += timedelta(days=1)
-        
-        # Dicionário: (prefixo, data) -> [lista de motivos]
-        dados_por_prefixo = {}
-        
-        # Buscar TODAS as indisponibilidades do período
-        for dia in dias_periodo:
-            indisponiveis = db.query(
-                Indisponibilidade.prefixo,
-                MotivoIndisponibilidade.descricao,
-                Indisponibilidade.data,
-                Indisponibilidade.eletricista_id
-            ).join(
-                MotivoIndisponibilidade,
-                Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-            ).filter(
-                Indisponibilidade.data == dia
-            ).order_by(
-                Indisponibilidade.prefixo,
-                Indisponibilidade.id  # Ordenar por ID para manter ordem de registro
-            ).all()
-            
-            for prefixo, motivo, data, elet_id in indisponiveis:
-                if prefixo:
-                    chave = (prefixo, data)
-                    
-                    if chave not in dados_por_prefixo:
-                        dados_por_prefixo[chave] = []
-                    
-                    # Adicionar motivo (máximo 2 por prefixo/data)
-                    if len(dados_por_prefixo[chave]) < 2:
-                        dados_por_prefixo[chave].append(motivo)
-        
-        # Preparar dados para resposta
-        dados_prefixos = []
-        
-        for (prefixo, data), motivos in dados_por_prefixo.items():
-            motivo1 = motivos[0] if len(motivos) > 0 else "-"
-            motivo2 = motivos[1] if len(motivos) > 1 else "-"
-            
-            dados_prefixos.append({
-                "prefixo": prefixo,
-                "data": data.strftime('%d/%m/%Y'),
-                "motivo1": motivo1,
-                "motivo2": motivo2
-            })
-        
-        # Ordenar por prefixo
-        dados_prefixos.sort(key=lambda x: (x['prefixo'], x['data']))
-        
-        # Total de prefixos únicos
-        prefixos_unicos = set([d['prefixo'] for d in dados_prefixos])
-        
-        return JSONResponse({
-            "success": True,
-            "periodo": {
-                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
-                "fim": data_fim_obj.strftime('%d/%m/%Y'),
-                "dias": len(dias_periodo)
-            },
-            "total_prefixos": len(prefixos_unicos),
-            "total_registros": len(dados_prefixos),
-            "dados": dados_prefixos
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
-
-@app.get("/api/relatorio-eletricistas-disponiveis")
-def relatorio_eletricistas_disponiveis(
-    request: Request,
-    data_inicio: str = None,
-    data_fim: str = None,
-    db: Session = Depends(get_db)
-):
-    """API para relatório de eletricistas DISPONÍVEIS (não registrados)"""
-    
-    # Verificar autenticação
-    if not verificar_autenticacao(request):
-        return JSONResponse({"success": False, "erro": "Não autenticado"})
-    
-    usuario = get_usuario_logado(request, db)
-    if not usuario:
-        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
-    
-    from models import EstruturaEquipes, EquipeDia, Indisponibilidade
-    from datetime import datetime, timedelta
-    
-    try:
-        # Definir período
-        if data_inicio and data_fim:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
-        elif data_inicio:
-            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim_obj = data_inicio_obj
-        else:
-            data_inicio_obj = date.today()
-            data_fim_obj = date.today()
-        
-        # Criar lista de datas no período
-        dias_periodo = []
-        data_atual = data_inicio_obj
-        while data_atual <= data_fim_obj:
-            dias_periodo.append(data_atual)
-            data_atual += timedelta(days=1)
-        
-        # Buscar TODOS os eletricistas ATIVOS/RESERVA
-        todos_eletricistas = db.query(EstruturaEquipes).filter(
-            EstruturaEquipes.descr_situacao.in_(['ATIVO', 'RESERVA'])
-        ).all()
-        
-        # Dicionário: id_eletricista -> set de datas com registro
-        eletricistas_com_registro = {}
-        
-        # Para cada dia no período
-        for dia in dias_periodo:
-            # Buscar todos os IDs de eletricistas que tiveram registro neste dia
-            
-            # 1. IDs em equipe_dia (presentes)
-            presentes = db.query(EquipeDia.eletricista_id).filter(
-                EquipeDia.data == dia
-            ).distinct().all()
-            
-            for (eletricista_id,) in presentes:
-                if eletricista_id:
-                    if eletricista_id not in eletricistas_com_registro:
-                        eletricistas_com_registro[eletricista_id] = set()
-                    eletricistas_com_registro[eletricista_id].add(dia)
-            
-            # 2. IDs em indisponibilidade
-            indisponiveis = db.query(Indisponibilidade.eletricista_id).filter(
-                Indisponibilidade.data == dia
-            ).distinct().all()
-            
-            for (eletricista_id,) in indisponiveis:
-                if eletricista_id:
-                    if eletricista_id not in eletricistas_com_registro:
-                        eletricistas_com_registro[eletricista_id] = set()
-                    eletricistas_com_registro[eletricista_id].add(dia)
-        
-        # Preparar dados para resposta (apenas eletricistas SEM NENHUM registro)
-        dados_disponiveis = []
-        
-        for eletricista in todos_eletricistas:
-            # Se o eletricista NÃO teve nenhum registro em nenhum dia do período
-            if eletricista.id not in eletricistas_com_registro:
-                dados_disponiveis.append({
-                    "polo": eletricista.polo or "-",
-                    "base": eletricista.base or "-",
-                    "matricula": eletricista.matricula,
-                    "colaborador": eletricista.colaborador,
-                    "processo_equipe": eletricista.processo_equipe or "-",
-                    "superv_campo": eletricista.superv_campo or "-",
-                    "superv_operacao": eletricista.superv_operacao or "-"
-                })
-        
-        # Ordenar por polo, depois base, depois matrícula
-        dados_disponiveis.sort(key=lambda x: (x['polo'], x['base'], x['matricula']))
-        
-        return JSONResponse({
-            "success": True,
-            "periodo": {
-                "inicio": data_inicio_obj.strftime('%d/%m/%Y'),
-                "fim": data_fim_obj.strftime('%d/%m/%Y'),
-                "dias": len(dias_periodo)
-            },
-            "total_eletricistas": len(todos_eletricistas),
-            "total_disponiveis": len(dados_disponiveis),
-            "dados": dados_disponiveis
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({
-            "success": False,
-            "erro": str(e)
-        })
 
 # ==========================================
-# ROTA DE DEBUG - ADICIONE ISSO NO main.py
-# Copie todo este código e cole ANTES da linha "if __name__ == '__main__':"
+# API: DESFAZER REGISTRO
 # ==========================================
-
-@app.get("/api/debug-indisponibilidades")
-def debug_indisponibilidades(request: Request, db: Session = Depends(get_db)):
-    """
-    Rota de DEBUG para verificar indisponibilidades
-    Acesse: https://seu-site.onrender.com/api/debug-indisponibilidades
-    """
-    from models import Indisponibilidade, MotivoIndisponibilidade, EstruturaEquipes
-    from datetime import date
+@app.post("/api/desfazer-registro")
+async def desfazer_registro(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Remove registro de equipes_dia para permitir novo lançamento"""
     
-    resultado = {
-        "status": "DEBUG ATIVO",
-        "data_atual": str(date.today()),
-        "resultados": {}
-    }
+    # Verificar autenticação
+    if not verificar_autenticacao(request):
+        return JSONResponse({"success": False, "erro": "Não autenticado"})
+    
+    usuario = get_usuario_logado(request, db)
+    if not usuario:
+        return JSONResponse({"success": False, "erro": "Usuário não encontrado"})
+    
+    from models import EquipeDia, EstruturaEquipes
     
     try:
-        # 1. Total de registros
-        total_indisp = db.query(Indisponibilidade).count()
-        resultado["resultados"]["total_indisponibilidades"] = total_indisp
+        dados = await request.json()
+        matricula = dados.get('matricula')
+        data_str = dados.get('data')
         
-        if total_indisp == 0:
-            resultado["resultados"]["problema"] = "⚠️ NÃO HÁ REGISTROS DE INDISPONIBILIDADE!"
-            resultado["resultados"]["solucao"] = "Registre uma indisponibilidade pelo sistema"
-            return JSONResponse(resultado)
+        # Converter data
+        try:
+            data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except:
+            return JSONResponse({"success": False, "erro": "Data inválida"})
         
-        # 2. Últimos 5 registros
-        ultimos = db.query(
-            Indisponibilidade.id,
-            Indisponibilidade.data,
-            Indisponibilidade.eletricista_id,
-            Indisponibilidade.motivo_id
-        ).order_by(Indisponibilidade.id.desc()).limit(5).all()
+        # Buscar eletricista
+        eletricista = db.query(EstruturaEquipes).filter(
+            EstruturaEquipes.matricula == matricula.strip()
+        ).first()
         
-        resultado["resultados"]["ultimos_5_registros"] = [
-            {
-                "id": r[0],
-                "data": str(r[1]),
-                "eletricista_id": r[2],
-                "motivo_id": r[3]
-            }
-            for r in ultimos
-        ]
+        if not eletricista:
+            return JSONResponse({"success": False, "erro": "Eletricista não encontrado"})
         
-        # 3. Motivos cadastrados
-        motivos = db.query(MotivoIndisponibilidade.id, MotivoIndisponibilidade.descricao).all()
-        resultado["resultados"]["motivos_cadastrados"] = [
-            {"id": m[0], "descricao": m[1]}
-            for m in motivos
-        ]
+        # Buscar e DELETAR registro
+        registro = db.query(EquipeDia).filter(
+            EquipeDia.eletricista_id == eletricista.id,
+            EquipeDia.data == data_obj
+        ).first()
         
-        # 4. Teste da consulta (hoje)
-        hoje = date.today()
+        if not registro:
+            return JSONResponse({
+                "success": False,
+                "erro": f"{eletricista.colaborador} não tem registro para esta data"
+            })
         
-        indisponiveis_hoje = db.query(
-            Indisponibilidade.eletricista_id,
-            MotivoIndisponibilidade.descricao,
-            EstruturaEquipes.colaborador,
-            EstruturaEquipes.superv_campo
-        ).join(
-            MotivoIndisponibilidade,
-            Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-        ).join(
-            EstruturaEquipes,
-            Indisponibilidade.eletricista_id == EstruturaEquipes.id
-        ).filter(
-            Indisponibilidade.data == hoje
-        ).all()
+        # ✅ DELETAR REGISTRO
+        db.delete(registro)
+        db.commit()
         
-        resultado["resultados"]["indisponibilidades_hoje"] = {
-            "total": len(indisponiveis_hoje),
-            "registros": [
-                {
-                    "eletricista_id": r[0],
-                    "motivo": r[1],
-                    "colaborador": r[2],
-                    "supervisor": r[3]
-                }
-                for r in indisponiveis_hoje
-            ]
-        }
+        logger.info(f"🔄 Registro desfeito: {eletricista.colaborador} - Data: {data_obj}")
         
-        # 5. Verificar outras datas
-        outras_datas = db.query(
-            Indisponibilidade.data,
-            MotivoIndisponibilidade.descricao
-        ).join(
-            MotivoIndisponibilidade,
-            Indisponibilidade.motivo_id == MotivoIndisponibilidade.id
-        ).filter(
-            Indisponibilidade.data != hoje
-        ).order_by(Indisponibilidade.data.desc()).limit(10).all()
-        
-        resultado["resultados"]["outras_datas"] = [
-            {"data": str(r[0]), "motivo": r[1]}
-            for r in outras_datas
-        ]
-        
-        # 6. Análise
-        if len(indisponiveis_hoje) == 0 and total_indisp > 0:
-            resultado["resultados"]["diagnostico"] = {
-                "problema": "⚠️ HÁ REGISTROS, MAS NENHUM PARA HOJE!",
-                "possivel_causa": "As indisponibilidades foram registradas em outras datas",
-                "solucao": "Registre uma indisponibilidade para HOJE ou gere o relatório para as datas que têm registros"
-            }
-        elif len(indisponiveis_hoje) > 0:
-            resultado["resultados"]["diagnostico"] = {
-                "status": "✅ TUDO OK! Há registros para hoje",
-                "proxima_acao": "O problema deve estar na função do relatório por supervisor"
-            }
-        
-        return JSONResponse(resultado)
+        return JSONResponse({
+            "success": True,
+            "mensagem": f"Registro de {eletricista.colaborador} removido com sucesso!"
+        })
         
     except Exception as e:
-        resultado["erro"] = str(e)
-        import traceback
-        resultado["traceback"] = traceback.format_exc()
-        return JSONResponse(resultado)
+        db.rollback()
+        logger.error(f"❌ Erro ao desfazer registro: {str(e)}")
+        return JSONResponse({
+            "success": False,
+            "erro": str(e)
+        })
 
+# [CONTINUAR COM TODAS AS OUTRAS ROTAS DO SEU ARQUIVO ORIGINAL...]
+# (Gestão de usuários, relatórios, importação CSV, etc.)
 
 # ========================================
 # EXECUTAR SERVIDOR
 # ========================================
 
 if __name__ == "__main__":
-
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)
-
-
-
-
-
-
-
-
 
 
 

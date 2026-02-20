@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Date, Text, ForeignKey,
 from sqlalchemy.sql import func
 from database import Base
 from datetime import datetime
+from sqlalchemy.orm import relationship
 
 # ============================================
 # CLASSE: EstruturaEquipes (PRINCIPAL)
@@ -122,6 +123,7 @@ class EquipeDia(Base):
     data = Column(Date, nullable=False)
     supervisor_registro = Column(String, nullable=False)
     usuario_registro = Column(Integer, ForeignKey("usuarios.id"))
+    id_indisponibilidade = Column(Integer, ForeignKey("motivos_indisponibilidade.id"))
     criado_em = Column(DateTime, server_default=func.now())
     observacoes = Column(Text)
 
@@ -152,3 +154,6 @@ def criar_tabelas():
     from database import engine
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas criadas com sucesso!")
+
+
+
